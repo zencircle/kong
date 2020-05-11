@@ -381,8 +381,13 @@ for _, strategy in helpers.each_strategy() do
         assert.is.table(health.data[1])
         assert.equals("HEALTHCHECKS_OFF", health.data[1].health)
         assert.equals("HEALTHCHECKS_OFF", health.data[1].data.addresses[1].health)
-      end, 15)
 
+        local balancer_health = bu.get_balancer_health(upstream_name)
+        assert.is.table(balancer_health)
+        assert.is.table(balancer_health.data)
+        assert.equals("HEALTHCHECKS_OFF", balancer_health.data.health)
+        assert.equals("HEALTHY", balancer_health.data.balancer_health)
+      end, 15)
     end)
 
     it("an upstream that is removed and readed keeps the health status", function()
@@ -1261,8 +1266,10 @@ for _, strategy in helpers.each_strategy() do
 
                 if health_threshold[i] < 100 then
                   assert.equals("HEALTHY", health.data.health)
+                  assert.equals("HEALTHY", health.data.balancer_health)
                 else
                   assert.equals("UNHEALTHY", health.data.health)
+                  assert.equals("UNHEALTHY", health.data.balancer_health)
                 end
 
                 -- 75% healthy
@@ -1280,8 +1287,10 @@ for _, strategy in helpers.each_strategy() do
 
                 if health_threshold[i] < 75 then
                   assert.equals("HEALTHY", health.data.health)
+                  assert.equals("HEALTHY", health.data.balancer_health)
                 else
                   assert.equals("UNHEALTHY", health.data.health)
+                  assert.equals("UNHEALTHY", health.data.balancer_health)
                 end
 
                 -- 50% healthy
@@ -1421,7 +1430,7 @@ for _, strategy in helpers.each_strategy() do
                   local requests = bu.SLOTS * 2 -- go round the balancer twice
                   local port1 = bu.gen_port()
                   local port2 = bu.gen_port()
-  
+
                   -- setup target servers:
                   -- server2 will only respond for part of the test,
                   -- then server1 will take over.
@@ -1430,7 +1439,7 @@ for _, strategy in helpers.each_strategy() do
                   local server2 = https_server.new(port2, "localhost", "http", true)
                   server1:start()
                   server2:start()
-  
+
                   -- configure healthchecks
                   bu.begin_testcase_setup(strategy, bp)
                   local upstream_name, upstream_id = bu.add_upstream(bp, {
