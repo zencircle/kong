@@ -1,6 +1,6 @@
 # Table of Contents
 
-- [3.0.0-alpha.1](#300-alpha1)
+- [3.0.0](#300)
 - [2.8.1](#281)
 - [2.8.0](#280)
 - [2.7.1](#271)
@@ -65,11 +65,14 @@
 - [0.9.9 and prior](#099---20170202)
 
 
+[Back to TOC](#table-of-contents)
+
+
 ## Unreleased
 
-## [3.0.0-alpha.1]
+## [3.0.0]
 
-> Released 2022/08/23
+> Released 2022/09/08
 
 ### Breaking Changes
 
@@ -7413,6 +7416,7 @@ First version running with Cassandra.
 [Back to TOC](#table-of-contents)
 
 [3.0.0-alpha.1]: https://github.com/Kong/kong/compare/2.8.1...3.0.0-alpha.1
+[3.0.0]: https://github.com/Kong/kong/compare/2.8.1...3.0.0
 [2.8.1]: https://github.com/Kong/kong/compare/2.8.0...2.8.1
 [2.8.0]: https://github.com/Kong/kong/compare/2.7.0...2.8.0
 [2.7.1]: https://github.com/Kong/kong/compare/2.7.0...2.7.1
