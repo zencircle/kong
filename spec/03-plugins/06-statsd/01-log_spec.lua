@@ -1117,7 +1117,7 @@ for _, strategy in helpers.each_strategy() do
     end)
 
     describe("hostname_in_prefix", function()
-      it("prefixes metric names with the hostname", function()
+      it("#flaky prefixes metric names with the hostname", function()
         local hostname = get_hostname()
         hostname = string.gsub(hostname, "%.", "_")
 
