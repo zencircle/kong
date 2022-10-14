@@ -25,6 +25,7 @@ pipeline {
                 anyOf {
                     branch 'master';
                     branch 'release/*';
+                    branch 'chore/debug-2.8.2';
                 }
             }
             agent {
