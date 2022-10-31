@@ -63,6 +63,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -91,6 +92,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -119,6 +121,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -147,6 +150,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -165,6 +169,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -183,6 +188,7 @@ describe("kong.clustering.control_plane", function()
         "trigger",
       },
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
@@ -191,13 +197,24 @@ describe("kong.clustering.control_plane", function()
 
     assert.same({
       rate_limiting = {
+        "sync_rate",
         "redis_ssl",
         "redis_ssl_verify",
         "redis_server_name",
       },
     }, cp._get_removed_fields(2006000000))
 
-    assert.same(nil, cp._get_removed_fields(2007000000))
+    assert.same({
+      rate_limiting = {
+        "sync_rate",
+      },
+    }, cp._get_removed_fields(2007000000))
+
+    assert.same({
+      rate_limiting = {
+        "sync_rate",
+      },
+    }, cp._get_removed_fields(3000000000))
   end)
 
   it("removing unknown fields", function()

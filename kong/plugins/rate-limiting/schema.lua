@@ -93,6 +93,7 @@ return {
           { hide_client_headers = { type = "boolean", required = true, default = false }, },
           { error_code = {type = "number", default = 429, gt = 0 }, },
           { error_message = {type = "string", default = "API rate limit exceeded" }, },
+          { sync_rate = { type = "number", required = true, default = 0 }, },
         },
         custom_validator = validate_periods_order,
       },

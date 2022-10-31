@@ -99,6 +99,12 @@
 - Data plane's connection to control plane is moved to a privileged worker process
   [#9432](https://github.com/Kong/kong/pull/9432)
 
+#### Plugins
+
+- **rate-limiting**: Add a new configuration `sync_rate` to the `redis` policy,
+  which synchronizes metrics to redis periodically instead of on every request.
+  [#9538](https://github.com/Kong/kong/pull/9538)
+
 ### Fixes
 
 #### Core
