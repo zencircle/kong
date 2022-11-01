@@ -690,7 +690,7 @@ local function _register_balancer_events(f)
 end
 
 
-local register_reconfigure_event
+local reconfigure_handler
 do
   local now = ngx.now
   local update_time = ngx.update_time
@@ -715,7 +715,7 @@ do
     return now() * 1000
   end
 
-  local function reconfigure_handler(data)
+  reconfigure_handler = function(data)
     local worker_id = ngx_worker_id()
 
     if is_exiting(worker_id) then
@@ -816,14 +816,6 @@ do
                " ms on worker #", worker_id, ": ", err)
     end
   end -- reconfigure_handler
-
-  register_reconfigure_event = function()
-    if db.strategy ~= "off" then
-      return
-    end
-
-    worker_events.register(reconfigure_handler, "declarative", "reconfigure")
-  end
 end
 
 
@@ -835,7 +827,9 @@ local function register_events()
   local cluster_events = kong.cluster_events
 
   -- declarative config updates
-  register_reconfigure_event()
+  if db.strategy == "off" then
+    worker_events.register(reconfigure_handler, "declarative", "reconfigure")
+  end
 
   -- events dispatcher
 
