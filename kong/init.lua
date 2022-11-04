@@ -837,9 +837,10 @@ end
 
 
 function Kong.exit_worker()
-  if not is_dp_worker_process() and not is_control_plane(kong.configuration) then
-    plugin_servers.stop()
+  if is_dp_worker_process() or is_control_plane(kong.configuration) then
+    return
   end
+  plugin_servers.stop()
 end
 
 
