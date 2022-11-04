@@ -359,13 +359,12 @@ end
 
 local WS_OPTS = {
   timeout = constants.CLUSTERING_TIMEOUT,
+  max_payload_len = kong.configuration.cluster_max_payload,
 }
 
 -- TODO: pick one random CP
 function _M.connect_cp(endpoint, conf, cert, cert_key, protocols)
   local address = conf.cluster_control_plane .. endpoint
-
-  WS_OPTS.max_payload_len = kong.configuration.cluster_max_payload
 
   local c = assert(ws_client:new(WS_OPTS))
   local uri = "wss://" .. address .. "?node_id=" ..
@@ -440,8 +439,6 @@ function _M.connect_dp(conf, cert_digest,
     ngx_log(ngx_WARN, _log_prefix, "data plane didn't pass the version", log_suffix)
     return nil, nil, 400
   end
-
-  WS_OPTS.max_payload_len = kong.configuration.cluster_max_payload
 
   local wb, err = ws_server:new(WS_OPTS)
 
