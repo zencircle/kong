@@ -89,6 +89,7 @@ local instrumentation = require "kong.tracing.instrumentation"
 local process = require "ngx.process"
 local tablepool = require "tablepool"
 local get_ctx_table = require("resty.core.ctx").get_ctx_table
+local is_dp_worker_process = require("kong.clustering.utils").is_dp_worker_process
 
 
 local kong             = kong
@@ -714,7 +715,7 @@ function Kong.init_worker()
 
   kong.db:set_events_handler(worker_events)
 
-  if process.type() == "privileged agent" then
+  if is_dp_worker_process() then
     if kong.clustering then
       kong.clustering:init_worker()
     end
@@ -812,7 +813,7 @@ end
 
 
 function Kong.exit_worker()
-  if process.type() ~= "privileged agent" and kong.configuration.role ~= "control_plane" then
+  if not is_dp_worker_process() and kong.configuration.role ~= "control_plane" then
     plugin_servers.stop()
   end
 end
