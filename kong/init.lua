@@ -177,6 +177,27 @@ do
                               "initialization errors; this node must be ",
                               "restarted (", init_worker_errors_str, ")")
   end
+end
+
+
+local is_data_plane
+local is_control_plane
+local is_dbless
+local is_dp_worker_process
+do
+  is_data_plane = function(role)
+    return role == "data_plane"
+  end
+
+
+  is_control_plane = function(role)
+    return role == "control_plane"
+  end
+
+
+  is_dbless = function(database)
+    return database == "off"
+  end
 
 
   is_dp_worker_process = function()
@@ -206,11 +227,10 @@ do
 
   reset_kong_shm = function(config)
     local kong_shm = ngx.shared.kong
-    local dbless = config.database == "off"
 
     local preserved = {}
 
-    if dbless then
+    if is_dbless(config.database) then
       if not (config.declarative_config or config.declarative_config_string) then
         preserved[DECLARATIVE_LOAD_KEY] = kong_shm:get(DECLARATIVE_LOAD_KEY)
       end
@@ -388,7 +408,7 @@ end
 
 
 local function execute_cache_warmup(kong_config)
-  if kong_config.database == "off" then
+  if is_dbless(kong_config.database) then
     return true
   end
 
@@ -588,7 +608,7 @@ function Kong.init()
     certificate.init()
   end
 
-  if is_http_module and (config.role == "data_plane" or config.role == "control_plane")
+  if is_http_module and (is_data_plane(config.role) or is_control_plane(config.role))
   then
     kong.clustering = require("kong.clustering").new(config)
   end
@@ -602,7 +622,7 @@ function Kong.init()
     stream_api.load_handlers()
   end
 
-  if config.database == "off" then
+  if is_dbless(config.database) then
     if is_http_module or
        (#config.proxy_listeners == 0 and
         #config.admin_listeners == 0 and
@@ -624,7 +644,7 @@ function Kong.init()
       error("error building initial plugins: " .. tostring(err))
     end
 
-    if config.role ~= "control_plane" then
+    if not is_control_plane(config.role) then
       assert(runloop.build_router("init"))
 
       ok, err = runloop.set_init_versions_in_cache()
@@ -639,7 +659,7 @@ function Kong.init()
 
   require("resty.kong.var").patch_metatable()
 
-  if config.role == "data_plane" then
+  if is_data_plane(config.role) then
     local ok, err = process.enable_privileged_agent(2048)
     if not ok then
       error(err)
@@ -727,7 +747,7 @@ function Kong.init_worker()
     return
   end
 
-  if kong.configuration.database == "off" then
+  if is_dbless(kong.configuration.database) then
     -- databases in LMDB need to be explicitly created, otherwise `get`
     -- operations will return error instead of `nil`. This ensures the default
     -- namespace always exists in the
@@ -770,7 +790,7 @@ function Kong.init_worker()
     end
   end
 
-  local is_not_control_plane = kong.configuration.role ~= "control_plane"
+  local is_not_control_plane = not is_control_plane(kong.configuration.role)
   if is_not_control_plane then
     ok, err = execute_cache_warmup(kong.configuration)
     if not ok then
@@ -818,7 +838,7 @@ end
 
 
 function Kong.exit_worker()
-  if not is_dp_worker_process() and kong.configuration.role ~= "control_plane" then
+  if not is_dp_worker_process() and not is_control_plane(kong.configuration.role) then
     plugin_servers.stop()
   end
 end
