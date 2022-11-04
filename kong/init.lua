@@ -89,7 +89,6 @@ local instrumentation = require "kong.tracing.instrumentation"
 local process = require "ngx.process"
 local tablepool = require "tablepool"
 local get_ctx_table = require("resty.core.ctx").get_ctx_table
-local is_dp_worker_process = require("kong.clustering.utils").is_dp_worker_process
 
 
 local kong             = kong
@@ -141,6 +140,7 @@ local schema_state
 
 local stash_init_worker_error
 local log_init_worker_errors
+local is_dp_worker_process
 do
   local init_worker_errors
   local init_worker_errors_str
@@ -176,6 +176,11 @@ do
     return ngx_log(ngx_ALERT, "unsafe request processing due to earlier ",
                               "initialization errors; this node must be ",
                               "restarted (", init_worker_errors_str, ")")
+  end
+
+
+  is_dp_worker_process = function()
+    return process.type() == "privileged agent"
   end
 end
 
