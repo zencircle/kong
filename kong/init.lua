@@ -140,7 +140,6 @@ local schema_state
 
 local stash_init_worker_error
 local log_init_worker_errors
-local is_dp_worker_process
 do
   local init_worker_errors
   local init_worker_errors_str
