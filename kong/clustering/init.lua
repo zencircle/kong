@@ -47,6 +47,7 @@ local function handle_dao_crud_event(data)
     return
   end
 
+    --ngx_log(ngx_ERR, _log_prefix, "broadcast event: [", data.schema.name .. ":" .. data.operation, ']')
   kong.cluster_events:broadcast("clustering:push_config", data.schema.name .. ":" .. data.operation)
 
   -- we have to re-broadcast event using `post` because the dao

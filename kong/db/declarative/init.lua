@@ -679,6 +679,10 @@ function declarative.load_into_cache(entities, meta, hash)
 
   assert(type(fallback_workspace) == "string")
 
+  --local nkeys = require("table.nkeys")
+  --ngx.log(ngx.ERR, "xxx declarative.load_into_cache, entities=", nkeys(entities))
+  --ngx.log(ngx.ERR, "xxx entities: [",require("inspect")(entities),"]")
+
   if not hash or hash == "" then
     hash = DECLARATIVE_EMPTY_CONFIG_HASH
   end
@@ -698,6 +702,7 @@ function declarative.load_into_cache(entities, meta, hash)
 
   for entity_name, items in pairs(entities) do
     yield(false, phase)
+    --ngx.log(ngx.ERR, "xxx entity_name: [",entity_name,"]")
 
     local dao = db[entity_name]
     if not dao then
@@ -761,6 +766,7 @@ function declarative.load_into_cache(entities, meta, hash)
       assert(type(ws_id) == "string")
 
       local cache_key = dao:cache_key(id, nil, nil, nil, nil, item.ws_id)
+      ngx.log(ngx.ERR, "xxx id: [",id,"]", cache_key)
 
       item = remove_nulls(item)
       if transform then
@@ -780,6 +786,7 @@ function declarative.load_into_cache(entities, meta, hash)
 
       local global_query_cache_key = dao:cache_key(id, nil, nil, nil, nil, "*")
       t:set(global_query_cache_key, item_marshalled)
+      ngx.log(ngx.ERR, "xxx id: [",id,"]", global_query_cache_key)
 
       -- insert individual entry for global query
       insert(keys_by_ws["*"], cache_key)

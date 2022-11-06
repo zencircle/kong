@@ -1453,6 +1453,9 @@ function DAO:post_crud_event(operation, entity, old_entity, options)
       old_entity_without_nulls = remove_nulls(utils.deep_copy(old_entity, false))
     end
 
+    --log(ERR, self.schema.name ," entity: [", require("inspect")(entity_without_nulls), "]")
+    --log(ERR, "schema: [", require("inspect")(self.schema), "]")
+
     local ok, err = self.events.post_local("dao:crud", operation, {
       operation  = operation,
       schema     = self.schema,

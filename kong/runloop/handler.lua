@@ -841,6 +841,7 @@ local function register_events()
       log(ERR, "[events] missing entity in crud subscriber")
       return
     end
+      --log(ERR, "xxx in crud subscriber")
 
     -- invalidate this entity anywhere it is cached if it has a
     -- caching key
@@ -848,6 +849,7 @@ local function register_events()
     local cache_key = db[data.schema.name]:cache_key(data.entity)
     local cache_obj = kong[constants.ENTITY_CACHE_STORE[data.schema.name]]
 
+      --log(ERR, "xxx in crud subscriber cache_key=", cache_key)
     if cache_key then
       cache_obj:invalidate(cache_key)
     end
