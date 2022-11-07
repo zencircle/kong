@@ -1,9 +1,13 @@
 local _M = {}
 local _MT = { __index = _M, }
 
+local utils = require "kong.tools.utils"
 
+local type = type
 local fmt = string.format
+local insert = table.insert
 local encode_base64 = ngx.encode_base64
+local sha256 = utils.sha256_hex
 local marshall = require("kong.db.declarative.marshaller").marshall
 
 local function gen_cache_key(dao, entity)
@@ -21,6 +25,71 @@ local function gen_global_cache_key(dao, entity)
 
   return cache_key
 end
+
+local function gen_schema_cache_key(dao, schema, entity)
+  if not schema.cache_key then
+    return nil
+  end
+
+  local cache_key = dao:cache_key(entity)
+
+  return cache_key
+end
+
+local function unique_field_key(schema_name, ws_id, field, value, unique_across_ws)
+  local ws_id = ""  --TODO
+  if unique_across_ws then
+    ws_id = ""
+  end
+
+  -- LMDB imposes a default limit of 511 for keys, but the length of our unique
+  -- value might be unbounded, so we'll use a checksum instead of the raw value
+  value = sha256(value)
+
+  return schema_name .. "|" .. ws_id .. "|" .. field .. ":" .. value
+end
+
+local function gen_unique_cache_key(schema, entity)
+  local db = kong.db
+  local uniques = {}
+
+  for fname, fdata in schema:each_field() do
+    local is_foreign = fdata.type == "foreign"
+    local fdata_reference = fdata.reference
+
+    if fdata.unique then
+      if is_foreign then
+        if #db[fdata_reference].schema.primary_key == 1 then
+          insert(uniques, fname)
+        end
+
+      else
+        insert(uniques, fname)
+      end
+    end
+  end
+
+  local keys = {}
+  for i = 1, #uniques do
+    local unique = uniques[i]
+    local unique_key = entity[unique]
+    if unique_key then
+      if type(unique_key) == "table" then
+        local _
+        -- this assumes that foreign keys are not composite
+        _, unique_key = next(unique_key)
+      end
+
+      local key = unique_field_key(schema.name, ws_id, unique, unique_key,
+                                   schema.fields[unique].unique_across_ws)
+
+      table.insert(keys, key)
+    end
+  end
+
+  return keys
+end
+
 
 local function get_marshall_value(entity)
   local value = marshall(entity)
@@ -51,6 +120,7 @@ function _M.insert(schema, entity)
   ngx.log(ngx.ERR, "xxx key = ", key)
 
   local global_key = gen_global_cache_key(dao, entity)
+  local schema_key = gen_schema_cache_key(dao, schema, entity)
 
   local value = get_marshall_value(entity)
 
@@ -65,6 +135,15 @@ function _M.insert(schema, entity)
   end
 
   res, err = connector:query(fmt(stmt, revision, global_key, value))
+
+  if schema_key then
+    res, err = connector:query(fmt(stmt, revision, schema_key, value))
+  end
+
+  local unique_keys = gen_unique_cache_key(schema, entity)
+  for _, key in ipairs(unique_keys) do
+    res, err = connector:query(fmt(stmt, revision, key, value))
+  end
 
   return true
 end
