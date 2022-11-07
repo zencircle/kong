@@ -117,13 +117,22 @@ end
 
 local config_version = 0
 
+local function get_now_ms()
+  ngx.update_time()
+  return ngx_time() * 1000
+end
+
+
 function _M:export_deflated_reconfigure_payload()
   ngx_log(ngx_DEBUG, _log_prefix, "exporting config")
 
+  --local start = get_now_ms()
   local config_table, err = declarative.export_config()
   if not config_table then
     return nil, err
   end
+
+  --ngx_log(ngx_ERR, "xxx export_config = ", get_now_ms() - start)
 
   -- update plugins map
   self.plugins_configured = {}
@@ -133,8 +142,10 @@ function _M:export_deflated_reconfigure_payload()
     end
   end
 
+  --local start = get_now_ms()
   local config_hash, hashes = calculate_config_hash(config_table)
   config_version = config_version + 1
+  --ngx_log(ngx_ERR, "xxx calculate_config_hash = ", get_now_ms() - start)
 
   -- store serialized plugins map for troubleshooting purposes
   local shm_key_name = "clustering:cp_plugins_configured:worker_" .. worker_id()
@@ -142,11 +153,16 @@ function _M:export_deflated_reconfigure_payload()
 
   local service = get_wrpc_service(self)
 
+  --local start = get_now_ms()
   -- yield between steps to prevent long delay
   local config_json = assert(cjson_encode(config_table))
   yield()
+  --ngx_log(ngx_ERR, "xxx cjson_encode = ", #config_json/1024)
   local config_compressed = assert(deflate_gzip(config_json))
   yield()
+  --ngx_log(ngx_ERR, "xxx gizp = ", #config_compressed/1024)
+  --ngx_log(ngx_ERR, "xxx cjson_encode/gzip = ", get_now_ms() - start)
+
   self.config_call_rpc, self.config_call_args = assert(service:encode_args("ConfigService.SyncConfig", {
     config = config_compressed,
     version = config_version,
