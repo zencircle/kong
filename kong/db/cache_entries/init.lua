@@ -6,12 +6,27 @@ local utils = require "kong.tools.utils"
 local type = type
 local fmt = string.format
 local insert = table.insert
+local null = ngx.null
 local encode_base64 = ngx.encode_base64
 local sha256 = utils.sha256_hex
 local marshall = require("kong.db.declarative.marshaller").marshall
 
-local function gen_cache_key(dao, entity)
+local function get_ws_id(schema, entity)
   local ws_id = ""
+  if schema.workspaceable then
+    local entity_ws_id = entity.ws_id
+    if entity_ws_id == null or entity_ws_id == nil then
+      entity_ws_id = kong.default_workspace
+    end
+    entity.ws_id = entity_ws_id
+    ws_id = entity_ws_id
+  end
+
+  return ws_id
+end
+
+local function gen_cache_key(dao, schema, entity)
+  local ws_id = get_ws_id(schema, entity)
 
   local cache_key = dao:cache_key(entity.id, nil, nil, nil, nil, ws_id)
 
@@ -37,7 +52,6 @@ local function gen_schema_cache_key(dao, schema, entity)
 end
 
 local function unique_field_key(schema_name, ws_id, field, value, unique_across_ws)
-  local ws_id = ""  --TODO
   if unique_across_ws then
     ws_id = ""
   end
@@ -80,7 +94,7 @@ local function gen_unique_cache_key(schema, entity)
         _, unique_key = next(unique_key)
       end
 
-      local key = unique_field_key(schema.name, ws_id, unique, unique_key,
+      local key = unique_field_key(schema.name, entity.ws_id or "", unique, unique_key,
                                    schema.fields[unique].unique_across_ws)
 
       table.insert(keys, key)
@@ -116,7 +130,7 @@ function _M.insert(schema, entity)
   local dao = kong.db[schema.name]
 
   local revision = 1
-  local key = gen_cache_key(dao, entity)
+  local key = gen_cache_key(dao, schema, entity)
   ngx.log(ngx.ERR, "xxx key = ", key)
 
   local global_key = gen_global_cache_key(dao, entity)

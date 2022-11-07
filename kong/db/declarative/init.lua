@@ -676,6 +676,8 @@ function declarative.load_into_cache(entities, meta, hash)
 
   local default_workspace = assert(find_default_ws(entities))
   local fallback_workspace = default_workspace
+  ngx.log(ngx.ERR, "xxx default_workspace = ", default_workspace)
+
 
   assert(type(fallback_workspace) == "string")
 
