@@ -104,6 +104,8 @@ local function gen_unique_cache_key(schema, entity)
   return keys
 end
 
+local function gen_global_workspace_key()
+end
 
 local function get_marshall_value(entity)
   local value = marshall(entity)
