@@ -5,11 +5,12 @@ local utils = require "kong.tools.utils"
 
 local type = type
 local fmt = string.format
-local insert = table.insert
+local tb_insert = table.insert
 local null = ngx.null
 local encode_base64 = ngx.encode_base64
 local sha256 = utils.sha256_hex
 local marshall = require("kong.db.declarative.marshaller").marshall
+local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
 local function get_ws_id(schema, entity)
   local ws_id = ""
@@ -74,11 +75,11 @@ local function gen_unique_cache_key(schema, entity)
     if fdata.unique then
       if is_foreign then
         if #db[fdata_reference].schema.primary_key == 1 then
-          insert(uniques, fname)
+          tb_insert(uniques, fname)
         end
 
       else
-        insert(uniques, fname)
+        tb_insert(uniques, fname)
       end
     end
   end
@@ -97,18 +98,32 @@ local function gen_unique_cache_key(schema, entity)
       local key = unique_field_key(schema.name, entity.ws_id or "", unique, unique_key,
                                    schema.fields[unique].unique_across_ws)
 
-      table.insert(keys, key)
+      tb_insert(keys, key)
     end
   end
 
   return keys
 end
 
-local function gen_global_workspace_key()
+local function gen_workspace_key(schema, entity)
+  local keys = {}
+  local entity_name = schema.name
+
+  if not schema.workspaceable then
+    tb_insert(keys, entity_name .. "||@list")
+    return keys
+  end
+
+  local ws_id = get_ws_id(schema, entity)
+
+  tb_insert(keys, entity_name .. "|" .. ws_id .. "|@list")
+  tb_insert(keys, entity_name .. "|*|@list")
+
+  return keys
 end
 
-local function get_marshall_value(entity)
-  local value = marshall(entity)
+local function get_marshall_value(obj)
+  local value = marshall(obj)
   ngx.log(ngx.ERR, "xxx value size = ", #value)
 
   return encode_base64(value)
@@ -138,24 +153,34 @@ local function get_revision()
 end
 
 function _M.insert(schema, entity)
+  local entity_name = schema.name
+
+  if entity_name == "clustering_data_planes" then
+    return true
+  end
+
   local connector = kong.db.connector
-  ngx.log(ngx.ERR, "xxx insert into cache_entries")
+  ngx.log(ngx.ERR, "xxx insert into cache_entries: ", entity_name)
 
   local stmt = "insert into cache_entries(revision, key, value) " ..
-               "values(%d, '%s', decode('%s', 'base64'))"
+               "values(%d, '%s', decode('%s', 'base64')) " ..
+               "ON CONFLICT (key) " ..
+               "DO UPDATE " ..
+               "  SET revision = EXCLUDED.revision, value = EXCLUDED.value" ..
+               ";"
 
-  local dao = kong.db[schema.name]
+  local dao = kong.db[entity_name]
 
   local revision = get_revision()
-  local key = gen_cache_key(dao, schema, entity)
-  ngx.log(ngx.ERR, "xxx key = ", key)
+  local cache_key = gen_cache_key(dao, schema, entity)
+  ngx.log(ngx.ERR, "xxx cache_key = ", cache_key)
 
   local global_key = gen_global_cache_key(dao, entity)
   local schema_key = gen_schema_cache_key(dao, schema, entity)
 
   local value = get_marshall_value(entity)
 
-  local sql = fmt(stmt, revision, key, value)
+  local sql = fmt(stmt, revision, cache_key, value)
 
   local res, err = connector:query(sql)
 
@@ -174,6 +199,42 @@ function _M.insert(schema, entity)
   local unique_keys = gen_unique_cache_key(schema, entity)
   for _, key in ipairs(unique_keys) do
     res, err = connector:query(fmt(stmt, revision, key, value))
+  end
+
+  local ws_keys = gen_workspace_key(schema, entity)
+
+  for _, key in ipairs(ws_keys) do
+    local sel_stmt = "select value from cache_entries " ..
+                 "where key='%s'"
+    local sql = fmt(sel_stmt, key)
+      ngx.log(ngx.ERR, "xxx sql = ", sql)
+    res, err = connector:query(sql)
+    if not res then
+      ngx.log(ngx.ERR, "xxx err = ", err)
+      return nil, err
+    end
+    local value = res and res[1] and res[1].value
+
+    if value then
+      local value = unmarshall(value)
+      tb_insert(value, cache_key)
+      value = get_marshall_value(value)
+      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      res, err = connector:query(fmt(stmt, revision, key, value))
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+    else
+
+      ngx.log(ngx.ERR, "xxx no value for ", key)
+
+      local value = get_marshall_value({cache_key})
+      sql = fmt(stmt, revision, key, value)
+      --ngx.log(ngx.ERR, "xxx sql:", sql)
+      --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+
+      res, err = connector:query(sql)
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+    end
   end
 
   return true

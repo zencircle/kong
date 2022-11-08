@@ -681,9 +681,9 @@ function declarative.load_into_cache(entities, meta, hash)
 
   assert(type(fallback_workspace) == "string")
 
-  --local nkeys = require("table.nkeys")
-  --ngx.log(ngx.ERR, "xxx declarative.load_into_cache, entities=", nkeys(entities))
-  ngx.log(ngx.ERR, "xxx entities: [",require("inspect")(entities),"]")
+  local nkeys = require("table.nkeys")
+  ngx.log(ngx.ERR, "xxx declarative.load_into_cache, entities=", nkeys(entities))
+  --ngx.log(ngx.ERR, "xxx entities: [",require("inspect")(entities),"]")
 
   if not hash or hash == "" then
     hash = DECLARATIVE_EMPTY_CONFIG_HASH
@@ -768,7 +768,7 @@ function declarative.load_into_cache(entities, meta, hash)
       assert(type(ws_id) == "string")
 
       local cache_key = dao:cache_key(id, nil, nil, nil, nil, item.ws_id)
-      ngx.log(ngx.ERR, "xxx id: [",id,"]", cache_key)
+      ngx.log(ngx.ERR, "xxx cache_key: [",id,"] ", cache_key)
 
       item = remove_nulls(item)
       if transform then
@@ -788,7 +788,7 @@ function declarative.load_into_cache(entities, meta, hash)
 
       local global_query_cache_key = dao:cache_key(id, nil, nil, nil, nil, "*")
       t:set(global_query_cache_key, item_marshalled)
-      ngx.log(ngx.ERR, "xxx id: [",id,"]", global_query_cache_key)
+      ngx.log(ngx.ERR, "xxx global: [",id,"] ", global_query_cache_key)
 
       -- insert individual entry for global query
       insert(keys_by_ws["*"], cache_key)
@@ -803,6 +803,7 @@ function declarative.load_into_cache(entities, meta, hash)
       if schema.cache_key then
         local cache_key = dao:cache_key(item)
         t:set(cache_key, item_marshalled)
+      ngx.log(ngx.ERR, "xxx schema.cache_key: [",id,"] ", cache_key)
       end
 
       for i = 1, #uniques do
@@ -819,6 +820,7 @@ function declarative.load_into_cache(entities, meta, hash)
                                        schema.fields[unique].unique_across_ws)
 
           t:set(key, item_marshalled)
+      ngx.log(ngx.ERR, "xxx unique.cache_key: [",id,"] ", key)
         end
       end
 
@@ -867,6 +869,7 @@ function declarative.load_into_cache(entities, meta, hash)
       end
 
       t:set(entity_prefix .. "|@list", keys)
+      ngx.log(ngx.ERR, "xxx ws key: ", entity_prefix .. "|@list")
 
       for ref, wss in pairs(page_for) do
         local fids = wss[ws_id]
@@ -880,6 +883,7 @@ function declarative.load_into_cache(entities, meta, hash)
             end
 
             t:set(key, entries)
+      ngx.log(ngx.ERR, "xxx page_for key: ", key)
           end
         end
       end
@@ -906,6 +910,7 @@ function declarative.load_into_cache(entities, meta, hash)
         end
 
         t:set(key, arr)
+      ngx.log(ngx.ERR, "xxx tags key: ", key)
       end
     end
   end
@@ -922,6 +927,7 @@ function declarative.load_into_cache(entities, meta, hash)
     end
 
     t:set(key, tags)
+      ngx.log(ngx.ERR, "xxx tags key: ", key)
   end
 
   -- tags||@list -> all tags, with no distinction of tag name or entity type.
