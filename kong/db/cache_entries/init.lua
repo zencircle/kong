@@ -122,6 +122,21 @@ end
 --  return setmetatable(self, _MT)
 --end
 
+local function get_revision()
+  local connector = kong.db.connector
+
+  local sql = "select nextval('cache_revision');"
+
+  local res, err = connector:query(sql)
+  if not res then
+  ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  --ngx.log(ngx.ERR, "xxx revison = ", require("inspect")(res))
+  return tonumber(res[1].nextval)
+end
+
 function _M.insert(schema, entity)
   local connector = kong.db.connector
   ngx.log(ngx.ERR, "xxx insert into cache_entries")
@@ -131,7 +146,7 @@ function _M.insert(schema, entity)
 
   local dao = kong.db[schema.name]
 
-  local revision = 1
+  local revision = get_revision()
   local key = gen_cache_key(dao, schema, entity)
   ngx.log(ngx.ERR, "xxx key = ", key)
 

@@ -7,6 +7,7 @@ return {
             "value"      BYTEA    NULL
             );
 
+        CREATE SEQUENCE "cache_revision";
       ]]
     },
     cassandra = {
