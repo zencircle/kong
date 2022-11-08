@@ -135,7 +135,7 @@ local function gen_foreign_key(schema, entity)
   end
 
   local entity_name = schema.name
-  local ws_id = get_ws_id(schema, entity)
+  local ws_ids = { "*", get_ws_id(schema, entity) }
 
   local keys = {}
   for name, ref in pairs(foreign_fields) do
@@ -145,9 +145,11 @@ local function gen_foreign_key(schema, entity)
       goto continue
     end
 
-    local key = entity_name .. "|" .. ws_id .. "|" .. ref .. "|" ..
-                fid .. "|@list"
-    tb_insert(keys, key)
+    for _, ws_id in ipairs(ws_ids) do
+      local key = entity_name .. "|" .. ws_id .. "|" .. ref .. "|" ..
+                  fid .. "|@list"
+      tb_insert(keys, key)
+    end
 
     ::continue::
   end
