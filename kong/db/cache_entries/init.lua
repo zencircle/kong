@@ -122,6 +122,39 @@ local function gen_workspace_key(schema, entity)
   return keys
 end
 
+
+local function gen_foreign_key(schema, entity)
+  local foreign_fields = {}
+  for fname, fdata in schema:each_field() do
+    local is_foreign = fdata.type == "foreign"
+    local fdata_reference = fdata.reference
+
+    if is_foreign then
+      foreign_fields[fname] = fdata_reference
+    end
+  end
+
+  local entity_name = schema.name
+  local ws_id = get_ws_id(schema, entity)
+
+  local keys = {}
+  for name, ref in pairs(foreign_fields) do
+    ngx.log(ngx.ERR, "xxx name = ", name, " ref = ", ref)
+    local fid = entity[name] and entity[name].id
+    if not fid then
+      goto continue
+    end
+
+    local key = entity_name .. "|" .. ws_id .. "|" .. ref .. "|" ..
+                fid .. "|@list"
+    tb_insert(keys, key)
+
+    ::continue::
+  end
+
+  return keys
+end
+
 local function get_marshall_value(obj)
   local value = marshall(obj)
   ngx.log(ngx.ERR, "xxx value size = ", #value)
@@ -201,9 +234,50 @@ function _M.insert(schema, entity)
     res, err = connector:query(fmt(stmt, revision, key, value))
   end
 
+  -- workspace key
+
   local ws_keys = gen_workspace_key(schema, entity)
 
   for _, key in ipairs(ws_keys) do
+    local sel_stmt = "select value from cache_entries " ..
+                 "where key='%s'"
+    local sql = fmt(sel_stmt, key)
+      ngx.log(ngx.ERR, "xxx sql = ", sql)
+    res, err = connector:query(sql)
+    if not res then
+      ngx.log(ngx.ERR, "xxx err = ", err)
+      return nil, err
+    end
+    local value = res and res[1] and res[1].value
+
+    if value then
+      local value = unmarshall(value)
+      tb_insert(value, cache_key)
+      value = get_marshall_value(value)
+      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      res, err = connector:query(fmt(stmt, revision, key, value))
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+    else
+
+      ngx.log(ngx.ERR, "xxx no value for ", key)
+
+      local value = get_marshall_value({cache_key})
+      sql = fmt(stmt, revision, key, value)
+      --ngx.log(ngx.ERR, "xxx sql:", sql)
+      --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+
+      res, err = connector:query(sql)
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+    end
+  end
+
+  -- foreign key
+  --ngx.log(ngx.ERR, "xxx = ", require("inspect")(entity))
+  local fkeys = gen_foreign_key(schema, entity)
+
+  for _, key in ipairs(fkeys) do
+    ngx.log(ngx.ERR, "xxx fkey = ", key)
     local sel_stmt = "select value from cache_entries " ..
                  "where key='%s'"
     local sql = fmt(sel_stmt, key)
