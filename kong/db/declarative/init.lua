@@ -768,7 +768,8 @@ function declarative.load_into_cache(entities, meta, hash)
       assert(type(ws_id) == "string")
 
       local cache_key = dao:cache_key(id, nil, nil, nil, nil, item.ws_id)
-      ngx.log(ngx.ERR, "xxx cache_key: [",id,"] ", cache_key)
+      --ngx.log(ngx.ERR, "xxx cache_key: [",id,"] ", cache_key)
+      ngx.log(ngx.ERR, "xxx cache_key: ", cache_key)
 
       item = remove_nulls(item)
       if transform then
@@ -788,7 +789,7 @@ function declarative.load_into_cache(entities, meta, hash)
 
       local global_query_cache_key = dao:cache_key(id, nil, nil, nil, nil, "*")
       t:set(global_query_cache_key, item_marshalled)
-      ngx.log(ngx.ERR, "xxx global: [",id,"] ", global_query_cache_key)
+      ngx.log(ngx.ERR, "xxx global: ", global_query_cache_key)
 
       -- insert individual entry for global query
       insert(keys_by_ws["*"], cache_key)
@@ -803,7 +804,7 @@ function declarative.load_into_cache(entities, meta, hash)
       if schema.cache_key then
         local cache_key = dao:cache_key(item)
         t:set(cache_key, item_marshalled)
-      ngx.log(ngx.ERR, "xxx schema.cache_key: [",id,"] ", cache_key)
+      ngx.log(ngx.ERR, "xxx schema.cache_key: ", cache_key)
       end
 
       for i = 1, #uniques do
@@ -820,7 +821,7 @@ function declarative.load_into_cache(entities, meta, hash)
                                        schema.fields[unique].unique_across_ws)
 
           t:set(key, item_marshalled)
-      ngx.log(ngx.ERR, "xxx unique.cache_key: [",id,"] ", key)
+      ngx.log(ngx.ERR, "xxx unique.cache_key: ", key)
         end
       end
 
