@@ -218,23 +218,6 @@
 - Bumped lua-resty-acme from 0.8.1 to 0.9.0
   [#9626](https://github.com/Kong/kong/pull/9626)
 
-
-### Additions
-
-#### Plugins
-
-- **Zipkin**: add `response_header_for_traceid` field in Zipkin plugin.
-  The plugin will set the corresponding header in the response
-  if the field is specified with a string value.
-  [#9173](https://github.com/Kong/kong/pull/9173)
-- **AWS Lambda**: add `requestContext` field into `awsgateway_compatible` input data
-  [#9380](https://github.com/Kong/kong/pull/9380)
-- **ACME**: add support for Redis SSL, through configuration properties
-  `config.storage_config.redis.ssl`, `config.storage_config.redis.ssl_verify`,
-  and `config.storage_config.redis.ssl_server_name`.
-  [#9626](https://github.com/Kong/kong/pull/9626)
-
-
 ## [3.0.0]
 
 > Released 2022/09/12
