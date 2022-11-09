@@ -254,7 +254,7 @@ function _M.cache_update(config_table)
   ngx_log(ngx.ERR, _log_prefix, "same config received from control plane")
   --ngx.log(ngx.ERR, "config = ", require("inspect")(config_table))
 
-  local res, err = cache_entries.import_config(config_table)
+  local res, err = cache_entries.load_into_cache_with_events(config_table)
   if not res then
     return nil, err
   end

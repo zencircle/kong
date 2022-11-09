@@ -2,6 +2,7 @@ local _M = {}
 local _MT = { __index = _M, }
 
 local utils = require "kong.tools.utils"
+local constants = require "kong.constants"
 local lmdb = require "resty.lmdb"
 local txn = require "resty.lmdb.transaction"
 
@@ -11,8 +12,11 @@ local tb_insert = table.insert
 local null = ngx.null
 local encode_base64 = ngx.encode_base64
 local sha256 = utils.sha256_hex
+local exiting = ngx.worker.exiting
 local marshall = require("kong.db.declarative.marshaller").marshall
 local unmarshall = require("kong.db.declarative.marshaller").unmarshall
+
+local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
 local function get_ws_id(schema, entity)
   local ws_id = ""
@@ -379,7 +383,8 @@ function _M.export_config(skip_ws, skip_disabled_entities)
   return res
 end
 
-function _M.import_config(entries)
+local function load_into_cache(entries)
+  --ngx.log(ngx.ERR, "xxx count = ", #entries)
 
   local t = txn.begin(#entries)
   t:db_drop(false)
@@ -391,6 +396,8 @@ function _M.import_config(entries)
 
     t:set(entry.key, entry.value)
   end -- entries
+
+  t:set(DECLARATIVE_HASH_KEY, tostring(latest_revision))
 
   local ok, err = t:commit()
   if not ok then
@@ -407,5 +414,67 @@ function _M.import_config(entries)
   return true
 end
 
+local function load_into_cache_with_events_no_lock(entries)
+  if exiting() then
+    return nil, "exiting"
+  end
+  --ngx.log(ngx.ERR, "xxx load_into_cache_with_events_no_lock = ", #entries)
+
+  local ok, err, default_ws = load_into_cache(entries)
+  if not ok then
+    if err:find("MDB_MAP_FULL", nil, true) then
+      return nil, "map full"
+
+    else
+      return nil, err
+    end
+  end
+
+  --[[
+  local worker_events = kong.worker_events
+
+  reconfigure_data = {
+    --default_ws,
+  }
+
+  ok, err = worker_events.post("declarative", "reconfigure", reconfigure_data)
+  if ok ~= "done" then
+    return nil, "failed to broadcast reconfigure event: " .. (err or ok)
+  end
+  --]]
+
+  -- TODO: send to stream subsystem
+
+  if exiting() then
+    return nil, "exiting"
+  end
+
+  return true
+end
+
+local DECLARATIVE_LOCK_TTL = 60
+local DECLARATIVE_RETRY_TTL_MAX = 10
+local DECLARATIVE_LOCK_KEY = "declarative:lock"
+
+function _M.load_into_cache_with_events(entries)
+  --ngx.log(ngx.ERR, "xxx load_into_cache_with_events = ", #entries)
+  local kong_shm = ngx.shared.kong
+
+  local ok, err = kong_shm:add(DECLARATIVE_LOCK_KEY, 0, DECLARATIVE_LOCK_TTL)
+  if not ok then
+    if err == "exists" then
+      local ttl = min(kong_shm:ttl(DECLARATIVE_LOCK_KEY), DECLARATIVE_RETRY_TTL_MAX)
+      return nil, "busy", ttl
+    end
+
+    kong_shm:delete(DECLARATIVE_LOCK_KEY)
+    return nil, err
+  end
+
+  ok, err = load_into_cache_with_events_no_lock(entries)
+  kong_shm:delete(DECLARATIVE_LOCK_KEY)
+
+  return ok, err
+end
 
 return _M
