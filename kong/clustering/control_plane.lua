@@ -185,7 +185,7 @@ end
 -- for test
 _M._update_compatible_payload = update_compatible_payload
 
-local SYNC_TEST = 1
+local SYNC_TEST = cache_entries.enable
 function _M:export_deflated_reconfigure_payload()
   local config_table, err
 

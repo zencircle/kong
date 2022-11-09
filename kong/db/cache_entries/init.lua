@@ -485,4 +485,7 @@ function _M.load_into_cache_with_events(entries)
   return ok, err
 end
 
+-- 1 => enable, 0 => disable
+_M.enable = 1
+
 return _M

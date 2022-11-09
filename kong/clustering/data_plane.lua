@@ -10,6 +10,7 @@ local declarative = require("kong.db.declarative")
 local constants = require("kong.constants")
 local utils = require("kong.tools.utils")
 local pl_stringx = require("pl.stringx")
+local cache_entries = require("kong.db.cache_entries")
 
 
 local assert = assert
@@ -179,7 +180,7 @@ function _M:communicate(premature)
             local config_table = assert(msg.config_table)
             local pok, res
 
-            local SYNC_TEST = 1
+            local SYNC_TEST = cache_entries.enable
             if SYNC_TEST == 0 then
 
             pok, res, err = pcall(config_helper.update, self.declarative_config,
