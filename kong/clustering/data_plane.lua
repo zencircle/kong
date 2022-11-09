@@ -175,11 +175,22 @@ function _M:communicate(premature)
               ngx_log(ngx_DEBUG, _log_prefix, "received reconfigure frame from control plane", log_suffix)
             end
 
+
             local config_table = assert(msg.config_table)
             local pok, res
-            --pok, res, err = pcall(config_helper.update, self.declarative_config,
-            --                      config_table, msg.config_hash, msg.hashes)
+
+            local SYNC_TEST = 1
+            if SYNC_TEST == 0 then
+
+            pok, res, err = pcall(config_helper.update, self.declarative_config,
+            config_table, msg.config_hash, msg.hashes)
+
+            else
+
             pok, res, err = pcall(config_helper.cache_update, config_table)
+
+            end
+
             if pok then
               if not res then
                 ngx_log(ngx_ERR, _log_prefix, "unable to update running config: ", err)

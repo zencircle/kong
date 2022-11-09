@@ -185,9 +185,15 @@ end
 -- for test
 _M._update_compatible_payload = update_compatible_payload
 
+local SYNC_TEST = 1
 function _M:export_deflated_reconfigure_payload()
-  --local config_table, err = declarative.export_config()
-  local config_table, err = cache_entries.export_config()
+  local config_table, err
+
+  if SYNC_TEST == 0 then
+    config_table, err = declarative.export_config()
+  else
+    config_table, err = cache_entries.export_config()
+  end
   if not config_table then
     return nil, err
   end
@@ -208,8 +214,12 @@ function _M:export_deflated_reconfigure_payload()
   kong_dict:set(shm_key_name, cjson_encode(self.plugins_configured))
   ngx_log(ngx_DEBUG, "plugin configuration map key: " .. shm_key_name .. " configuration: ", kong_dict:get(shm_key_name))
 
-  --local config_hash, hashes = calculate_config_hash(config_table)
-  local config_hash, hashes = 1, {}
+  local config_hash, hashes
+  if SYNC_TEST == 0 then
+    config_hash, hashes = calculate_config_hash(config_table)
+  else
+    config_hash, hashes = 1, {}
+  end
 
   local payload = {
     type = "reconfigure",
