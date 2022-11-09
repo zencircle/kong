@@ -58,6 +58,9 @@ else
 	OFFICIAL_RELEASE = false
 	ISTAG = false
 endif
+RELEASE_DOCKER_ONLY = false
+OFFICIAL_RELEASE = true
+ISTAG = true
 
 release-docker-images:
 	cd $(KONG_BUILD_TOOLS_LOCATION); \
