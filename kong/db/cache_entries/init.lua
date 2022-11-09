@@ -316,4 +316,65 @@ function _M.insert(schema, entity)
   return true
 end
 
+local function begin_transaction(db)
+  if db.strategy == "postgres" then
+    local ok, err = db.connector:connect("read")
+    if not ok then
+      return nil, err
+    end
+
+    ok, err = db.connector:query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;", "read")
+    if not ok then
+      return nil, err
+    end
+  end
+
+  return true
+end
+
+
+local function end_transaction(db)
+  if db.strategy == "postgres" then
+    -- just finish up the read-only transaction,
+    -- either COMMIT or ROLLBACK is fine.
+    db.connector:query("ROLLBACK;", "read")
+    db.connector:setkeepalive()
+  end
+end
+
+
+function _M.export_config(skip_ws, skip_disabled_entities)
+  -- default skip_ws=false and skip_disabled_services=true
+  if skip_ws == nil then
+    skip_ws = false
+  end
+
+  if skip_disabled_entities == nil then
+    skip_disabled_entities = true
+  end
+
+  -- TODO: disabled_services
+
+  local db = kong.db
+
+  local ok, err = begin_transaction(db)
+  if not ok then
+    return nil, err
+  end
+
+  local stmt = "select revision, key, value " ..
+               "from cache_entries;"
+
+  local res, err = db.connector:query(stmt)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    end_transaction(db)
+    return nil, err
+  end
+
+  end_transaction(db)
+
+  return res
+end
+
 return _M

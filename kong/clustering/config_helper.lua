@@ -248,4 +248,12 @@ end
 _M.calculate_config_hash = calculate_config_hash
 
 
+function _M.cache_update(config_table)
+  assert(type(config_table) == "table")
+  ngx_log(ngx.ERR, _log_prefix, "same config received from control plane")
+  ngx.log(ngx.ERR, "config = ", require("inspect")(config_table))
+
+  return true
+end
+
 return _M

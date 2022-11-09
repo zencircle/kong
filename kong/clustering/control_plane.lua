@@ -5,6 +5,7 @@ local _MT = { __index = _M, }
 local semaphore = require("ngx.semaphore")
 local cjson = require("cjson.safe")
 local declarative = require("kong.db.declarative")
+local cache_entries = require("kong.db.cache_entries")
 local utils = require("kong.tools.utils")
 local clustering_utils = require("kong.clustering.utils")
 local constants = require("kong.constants")
@@ -185,7 +186,8 @@ end
 _M._update_compatible_payload = update_compatible_payload
 
 function _M:export_deflated_reconfigure_payload()
-  local config_table, err = declarative.export_config()
+  --local config_table, err = declarative.export_config()
+  local config_table, err = cache_entries.export_config()
   if not config_table then
     return nil, err
   end
@@ -206,7 +208,8 @@ function _M:export_deflated_reconfigure_payload()
   kong_dict:set(shm_key_name, cjson_encode(self.plugins_configured))
   ngx_log(ngx_DEBUG, "plugin configuration map key: " .. shm_key_name .. " configuration: ", kong_dict:get(shm_key_name))
 
-  local config_hash, hashes = calculate_config_hash(config_table)
+  --local config_hash, hashes = calculate_config_hash(config_table)
+  local config_hash, hashes = 1, {}
 
   local payload = {
     type = "reconfigure",
@@ -235,7 +238,7 @@ function _M:export_deflated_reconfigure_payload()
   self.current_hashes = hashes
   self.current_config_hash = config_hash
   self.deflated_reconfigure_payload = payload
-  ngx.log(ngx.ERR, "xxx gizp size = ", #payload)
+  ngx.log(ngx.ERR, "xxx gzip size = ", #payload)
 
   return payload, nil, config_hash
 end

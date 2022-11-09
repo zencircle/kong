@@ -158,11 +158,13 @@ function _M:communicate(premature)
       local ok, err = config_semaphore:wait(1)
       if ok then
         local data = next_data
+        ngx.log(ngx.ERR, "xxx gzip size = ", #data)
         if data then
           local msg = assert(inflate_gzip(data))
           yield()
           msg = assert(cjson_decode(msg))
           yield()
+          ngx.log(ngx.ERR, "msg = ", require("inspect")(msg))
 
           if msg.type == "reconfigure" then
             if msg.timestamp then
@@ -175,8 +177,9 @@ function _M:communicate(premature)
 
             local config_table = assert(msg.config_table)
             local pok, res
-            pok, res, err = pcall(config_helper.update, self.declarative_config,
-                                  config_table, msg.config_hash, msg.hashes)
+            --pok, res, err = pcall(config_helper.update, self.declarative_config,
+            --                      config_table, msg.config_hash, msg.hashes)
+            pok, res, err = pcall(config_helper.cache_update, config_table)
             if pok then
               if not res then
                 ngx_log(ngx_ERR, _log_prefix, "unable to update running config: ", err)
