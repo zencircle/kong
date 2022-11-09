@@ -386,6 +386,8 @@ end
 local function load_into_cache(entries)
   --ngx.log(ngx.ERR, "xxx count = ", #entries)
 
+  local default_ws
+
   local t = txn.begin(#entries)
   t:db_drop(false)
 
@@ -395,6 +397,12 @@ local function load_into_cache(entries)
     ngx.log(ngx.ERR, "xxx revision = ", entry.revision, " key = ", entry.key)
 
     t:set(entry.key, entry.value)
+
+    if entry.key == "workspaces:default:::::" then
+      local obj = unmarshall(entry.value)
+      default_ws = obj.id
+      ngx.log(ngx.ERR, "xxx find default_ws = ", default_ws)
+    end
   end -- entries
 
   t:set(DECLARATIVE_HASH_KEY, tostring(latest_revision))
@@ -411,7 +419,7 @@ local function load_into_cache(entries)
   kong.core_cache:purge()
   kong.cache:purge()
 
-  return true
+  return true, nil, default_ws
 end
 
 local function load_into_cache_with_events_no_lock(entries)
@@ -432,7 +440,7 @@ local function load_into_cache_with_events_no_lock(entries)
 
   local worker_events = kong.worker_events
 
-  local default_ws = "27f28420-1eb1-49ea-847e-a1ae522bcaca"
+  --local default_ws = "6af4a340-fab2-4ed8-953d-21b852133fa6"
 
   local reconfigure_data = {
     default_ws,

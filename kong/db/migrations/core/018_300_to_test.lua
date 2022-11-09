@@ -8,8 +8,8 @@ local function p_generate_cache_entries(connector)
     if err then
       return nil, err
     end
-    ngx.log(ngx.ERR, "xxx ws.name:", ws.name)
-    ngx.log(ngx.ERR, "xxx ws.id:", ws.id)
+    --ngx.log(ngx.ERR, "xxx ws.name:", ws.name)
+    --ngx.log(ngx.ERR, "xxx ws.id:", ws.id)
 
     local keys = {
       cache_key = "workspaces:" .. ws.id .. ":::::",
@@ -25,7 +25,7 @@ local function p_generate_cache_entries(connector)
                  "values(%d, '%s', decode('%s', 'base64'))"
 
     for name, key in pairs(keys) do
-      ngx.log(ngx.ERR, "xxx ", name, " : ", key)
+      --ngx.log(ngx.ERR, "xxx ", name, " : ", key)
 
       local sql = string.format(stmt, revision, key, value)
 
