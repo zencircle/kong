@@ -190,6 +190,9 @@ function _M:export_deflated_reconfigure_payload()
     return nil, err
   end
 
+  ngx.log(ngx.ERR, "xxx export_deflated_reconfigure_payload")
+  --ngx.log(ngx.ERR, "xxx tbl: ", require("inspect")(config_table))
+
   -- update plugins map
   self.plugins_configured = {}
   if config_table.plugins then
@@ -232,6 +235,7 @@ function _M:export_deflated_reconfigure_payload()
   self.current_hashes = hashes
   self.current_config_hash = config_hash
   self.deflated_reconfigure_payload = payload
+  ngx.log(ngx.ERR, "xxx gizp size = ", #payload)
 
   return payload, nil, config_hash
 end
@@ -239,6 +243,8 @@ end
 
 function _M:push_config()
   local start = ngx_now()
+
+  ngx.log(ngx.ERR, "xxx cp push_config")
 
   local payload, err = self:export_deflated_reconfigure_payload()
   if not payload then
@@ -467,6 +473,7 @@ function _M:handle_cp_websocket()
           end
 
         else -- is reconfigure
+          ngx.log(ngx.ERR, "xxx cp reconfigure")
           local previous_sync_status = sync_status
           ok, err, sync_status = self:check_configuration_compatibility(dp_plugins_map)
           if ok then
