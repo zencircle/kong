@@ -164,7 +164,7 @@ function _M:communicate(premature)
           yield()
           msg = assert(cjson_decode(msg))
           yield()
-          ngx.log(ngx.ERR, "msg = ", require("inspect")(msg))
+          --ngx.log(ngx.ERR, "msg = ", require("inspect")(msg))
 
           if msg.type == "reconfigure" then
             if msg.timestamp then

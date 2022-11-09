@@ -2,6 +2,8 @@ local _M = {}
 local _MT = { __index = _M, }
 
 local utils = require "kong.tools.utils"
+local lmdb = require "resty.lmdb"
+local txn = require "resty.lmdb.transaction"
 
 local type = type
 local fmt = string.format
@@ -376,5 +378,34 @@ function _M.export_config(skip_ws, skip_disabled_entities)
 
   return res
 end
+
+function _M.import_config(entries)
+
+  local t = txn.begin(#entries)
+  t:db_drop(false)
+
+  local latest_revision = 0
+  for _, entry in ipairs(entries) do
+    latest_revision = math.max(latest_revision, entry.revision)
+    ngx.log(ngx.ERR, "xxx revision = ", entry.revision, " key = ", entry.key)
+
+    t:set(entry.key, entry.value)
+  end -- entries
+
+  local ok, err = t:commit()
+  if not ok then
+    return nil, err
+  end
+
+  ngx.log(ngx.ERR, "xxx latest_revision = ", latest_revision)
+
+  --kong.default_workspace = default_workspace
+
+  kong.core_cache:purge()
+  kong.cache:purge()
+
+  return true
+end
+
 
 return _M

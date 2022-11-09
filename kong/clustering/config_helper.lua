@@ -1,5 +1,6 @@
 local constants = require("kong.constants")
 local declarative = require("kong.db.declarative")
+local cache_entries = require("kong.db.cache_entries")
 local tablepool = require("tablepool")
 local isempty = require("table.isempty")
 local isarray = require("table.isarray")
@@ -251,7 +252,12 @@ _M.calculate_config_hash = calculate_config_hash
 function _M.cache_update(config_table)
   assert(type(config_table) == "table")
   ngx_log(ngx.ERR, _log_prefix, "same config received from control plane")
-  ngx.log(ngx.ERR, "config = ", require("inspect")(config_table))
+  --ngx.log(ngx.ERR, "config = ", require("inspect")(config_table))
+
+  local res, err = cache_entries.import_config(config_table)
+  if not res then
+    return nil, err
+  end
 
   return true
 end
