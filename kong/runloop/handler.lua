@@ -727,7 +727,8 @@ local function register_events()
       update_time()
       local reconfigure_started_at = now() * 1000
 
-      log(INFO, "declarative reconfigure was started on worker #", worker_id)
+      --log(INFO, "declarative reconfigure was started on worker #", worker_id)
+      log(ERR, "declarative reconfigure was started on worker #", worker_id)
 
       local default_ws
       local router_hash

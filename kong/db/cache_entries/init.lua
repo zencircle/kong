@@ -430,18 +430,18 @@ local function load_into_cache_with_events_no_lock(entries)
     end
   end
 
-  --[[
   local worker_events = kong.worker_events
 
-  reconfigure_data = {
-    --default_ws,
+  local default_ws = "27f28420-1eb1-49ea-847e-a1ae522bcaca"
+
+  local reconfigure_data = {
+    default_ws,
   }
 
   ok, err = worker_events.post("declarative", "reconfigure", reconfigure_data)
   if ok ~= "done" then
     return nil, "failed to broadcast reconfigure event: " .. (err or ok)
   end
-  --]]
 
   -- TODO: send to stream subsystem
 
