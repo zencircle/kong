@@ -18,6 +18,14 @@ local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
 local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
+-- generate from schemas
+local cascade_deleting_schemas = {
+  upstreams = { "targets", },
+  consumers = { "plugins", },
+  routes = { "plugins", },
+  services = { "plugins", },
+}
+
 local function get_ws_id(schema, entity)
   local ws_id = ""
   if schema.workspaceable then
@@ -383,9 +391,10 @@ function _M.delete(schema, entity)
     tb_insert(keys, schema_key)
   end
 
+  local sql
   local res, err
   for _, key in ipairs(keys) do
-    local sql = fmt(del_stmt, key)
+    sql = fmt(del_stmt, key)
     ngx.log(ngx.ERR, "xxx delete sql = ", sql)
 
     res, err = connector:query(sql)
@@ -441,6 +450,29 @@ function _M.delete(schema, entity)
       res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
     end
+  end
+
+  -- cascade delete
+  local cascade_deleting = cascade_deleting_schemas[entity_name]
+  if not cascade_deleting then
+    return true
+  end
+
+  -- here we only delete foreign keys
+  -- dao will cascade delete other entities
+  local ws_ids = { "*", get_ws_id(schema, entity) }
+
+  for _, v in ipairs(cascade_deleting) do
+    local del_schema = kong.db.daos[v].schema
+
+    for _, ws_id in ipairs(ws_ids) do
+      local fkey = v .. "|" .. ws_id .. "|" .. entity_name .. "|" ..
+                   entity.id .. "|@list"
+      sql = fmt(del_stmt, fkey)
+      ngx.log(ngx.ERR, "xxx delete sql = ", sql)
+      res, err = connector:query(sql)
+    end
+
   end
 
   return true
