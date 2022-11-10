@@ -345,11 +345,12 @@ function _M.delete(schema, entity)
     tb_insert(keys, schema_key)
   end
 
+  local res, err
   for _, key in ipairs(keys) do
     local sql = fmt(del_stmt, key)
     ngx.log(ngx.ERR, "xxx delete sql = ", sql)
 
-    local res, err = connector:query(sql)
+    res, err = connector:query(sql)
     if not res then
       ngx.log(ngx.ERR, "xxx err = ", err)
       return nil, err
@@ -358,6 +359,7 @@ function _M.delete(schema, entity)
 
   -- workspace key
 
+  local revision = get_revision()
   local ws_keys = gen_workspace_key(schema, entity)
 
   for _, key in ipairs(ws_keys) do
@@ -365,14 +367,16 @@ function _M.delete(schema, entity)
 
     if value then
       local list = unmarshall(value)
+      ngx.log(ngx.ERR, "xxx list is: ", unpack(list))
+
       local new_list = {}
-      for _,v in ipairs(liset) do
+      for _,v in ipairs(list) do
         if v ~= cache_key then
           tb_insert(new_list)
         end
       end
       value = get_marshall_value(new_list)
-      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      ngx.log(ngx.ERR, "xxx delete for ", key)
       res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
     end
@@ -386,14 +390,16 @@ function _M.delete(schema, entity)
 
     if value then
       local list = unmarshall(value)
+      ngx.log(ngx.ERR, "xxx list is: ", unpack(list))
+
       local new_list = {}
-      for _,v in ipairs(liset) do
+      for _,v in ipairs(list) do
         if v ~= cache_key then
           tb_insert(new_list)
         end
       end
       value = get_marshall_value(new_list)
-      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      ngx.log(ngx.ERR, "xxx delete for ", key)
       res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
     end
