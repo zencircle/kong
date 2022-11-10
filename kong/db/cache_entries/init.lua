@@ -414,12 +414,13 @@ function _M.delete(schema, entity)
 
     if value then
       local list = unmarshall(value)
-      ngx.log(ngx.ERR, "xxx list is: ", unpack(list))
+      --ngx.log(ngx.ERR, "xxx re-arrange list is: ", unpack(list))
 
+      -- remove this cache_key
       local new_list = {}
       for _,v in ipairs(list) do
         if v ~= cache_key then
-          tb_insert(new_list)
+          tb_insert(new_list, v)
         end
       end
       value = get_marshall_value(new_list)
@@ -437,12 +438,12 @@ function _M.delete(schema, entity)
 
     if value then
       local list = unmarshall(value)
-      ngx.log(ngx.ERR, "xxx list is: ", unpack(list))
+      --ngx.log(ngx.ERR, "xxx re-arrange list is: ", unpack(list))
 
       local new_list = {}
       for _,v in ipairs(list) do
         if v ~= cache_key then
-          tb_insert(new_list)
+          tb_insert(new_list, v)
         end
       end
       value = get_marshall_value(new_list)
@@ -600,8 +601,10 @@ local function load_into_cache_with_events_no_lock(entries)
 
   local reconfigure_data = {
     default_ws,
+    -- other hash is nil, trigger router/balancer rebuild
   }
 
+  -- go to runloop/handler reconfigure_handler
   ok, err = worker_events.post("declarative", "reconfigure", reconfigure_data)
   if ok ~= "done" then
     return nil, "failed to broadcast reconfigure event: " .. (err or ok)
@@ -620,6 +623,7 @@ local DECLARATIVE_LOCK_TTL = 60
 local DECLARATIVE_RETRY_TTL_MAX = 10
 local DECLARATIVE_LOCK_KEY = "declarative:lock"
 
+-- copied from declarative/init.lua
 function _M.load_into_cache_with_events(entries)
   --ngx.log(ngx.ERR, "xxx load_into_cache_with_events = ", #entries)
   local kong_shm = ngx.shared.kong
@@ -642,6 +646,7 @@ function _M.load_into_cache_with_events(entries)
 end
 
 -- 1 => enable, 0 => disable
+-- flag `SYNC_TEST` in clustering/control_plane.lua
 _M.enable = 1
 
 return _M
