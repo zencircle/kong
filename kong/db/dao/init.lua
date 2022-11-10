@@ -1462,7 +1462,7 @@ function DAO:post_crud_event(operation, entity, old_entity, options)
     if operation == "delete" then
       cache_entries.delete(self.schema, entity_without_nulls)
     else
-      cache_entries.upsert(self.schema, entity_without_nulls)
+      cache_entries.upsert(self.schema, entity_without_nulls, old_entity_without_nulls)
     end
 
     local ok, err = self.events.post_local("dao:crud", operation, {

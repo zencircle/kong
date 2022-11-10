@@ -209,7 +209,13 @@ local function query_list_value(connector, key)
   return value
 end
 
-function _M.upsert(schema, entity)
+local upsert_stmt = "insert into cache_entries(revision, key, value) " ..
+                    "values(%d, '%s', decode('%s', 'base64')) " ..
+                    "ON CONFLICT (key) " ..
+                    "DO UPDATE " ..
+                    "  SET revision = EXCLUDED.revision, value = EXCLUDED.value"
+
+function _M.upsert(schema, entity, old_entity)
   local entity_name = schema.name
 
   if entity_name == "clustering_data_planes" then
@@ -218,13 +224,6 @@ function _M.upsert(schema, entity)
 
   local connector = kong.db.connector
   ngx.log(ngx.ERR, "xxx insert into cache_entries: ", entity_name)
-
-  local stmt = "insert into cache_entries(revision, key, value) " ..
-               "values(%d, '%s', decode('%s', 'base64')) " ..
-               "ON CONFLICT (key) " ..
-               "DO UPDATE " ..
-               "  SET revision = EXCLUDED.revision, value = EXCLUDED.value" ..
-               ";"
 
   local dao = kong.db[entity_name]
 
@@ -237,7 +236,7 @@ function _M.upsert(schema, entity)
 
   local value = get_marshall_value(entity)
 
-  local sql = fmt(stmt, revision, cache_key, value)
+  local sql = fmt(upsert_stmt, revision, cache_key, value)
 
   local res, err = connector:query(sql)
 
@@ -247,15 +246,15 @@ function _M.upsert(schema, entity)
     return nil, err
   end
 
-  res, err = connector:query(fmt(stmt, revision, global_key, value))
+  res, err = connector:query(fmt(upsert_stmt, revision, global_key, value))
 
   if schema_key then
-    res, err = connector:query(fmt(stmt, revision, schema_key, value))
+    res, err = connector:query(fmt(upsert_stmt, revision, schema_key, value))
   end
 
   local unique_keys = gen_unique_cache_key(schema, entity)
   for _, key in ipairs(unique_keys) do
-    res, err = connector:query(fmt(stmt, revision, key, value))
+    res, err = connector:query(fmt(upsert_stmt, revision, key, value))
   end
 
   -- workspace key
@@ -270,7 +269,7 @@ function _M.upsert(schema, entity)
       tb_insert(value, cache_key)
       value = get_marshall_value(value)
       ngx.log(ngx.ERR, "xxx upsert for ", key)
-      res, err = connector:query(fmt(stmt, revision, key, value))
+      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
 
     else
@@ -278,7 +277,7 @@ function _M.upsert(schema, entity)
       ngx.log(ngx.ERR, "xxx no value for ", key)
 
       local value = get_marshall_value({cache_key})
-      sql = fmt(stmt, revision, key, value)
+      sql = fmt(upsert_stmt, revision, key, value)
       --ngx.log(ngx.ERR, "xxx sql:", sql)
       --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
 
@@ -299,7 +298,7 @@ function _M.upsert(schema, entity)
       tb_insert(value, cache_key)
       value = get_marshall_value(value)
       ngx.log(ngx.ERR, "xxx upsert for ", key)
-      res, err = connector:query(fmt(stmt, revision, key, value))
+      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
 
     else
@@ -307,7 +306,7 @@ function _M.upsert(schema, entity)
       ngx.log(ngx.ERR, "xxx no value for ", key)
 
       local value = get_marshall_value({cache_key})
-      sql = fmt(stmt, revision, key, value)
+      sql = fmt(upsert_stmt, revision, key, value)
       --ngx.log(ngx.ERR, "xxx sql:", sql)
       --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
 
@@ -329,7 +328,7 @@ function _M.delete(schema, entity)
   local connector = kong.db.connector
   ngx.log(ngx.ERR, "xxx delete from cache_entries: ", entity_name)
 
-  local stmt = "delete from cache_entries " ..
+  local del_stmt = "delete from cache_entries " ..
                "where key='%s'"
 
   local dao = kong.db[entity_name]
@@ -347,7 +346,7 @@ function _M.delete(schema, entity)
   end
 
   for _, key in ipairs(keys) do
-    local sql = fmt(stmt, key)
+    local sql = fmt(del_stmt, key)
     ngx.log(ngx.ERR, "xxx delete sql = ", sql)
 
     local res, err = connector:query(sql)
@@ -361,6 +360,44 @@ function _M.delete(schema, entity)
 
   local ws_keys = gen_workspace_key(schema, entity)
 
+  for _, key in ipairs(ws_keys) do
+    local value = query_list_value(connector, key)
+
+    if value then
+      local list = unmarshall(value)
+      local new_list = {}
+      for _,v in ipairs(liset) do
+        if v ~= cache_key then
+          tb_insert(new_list)
+        end
+      end
+      value = get_marshall_value(new_list)
+      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+    end
+  end
+
+  -- foreign key
+  local fkeys = gen_foreign_key(schema, entity)
+
+  for _, key in ipairs(fkeys) do
+    local value = query_list_value(connector, key)
+
+    if value then
+      local list = unmarshall(value)
+      local new_list = {}
+      for _,v in ipairs(liset) do
+        if v ~= cache_key then
+          tb_insert(new_list)
+        end
+      end
+      value = get_marshall_value(new_list)
+      ngx.log(ngx.ERR, "xxx upsert for ", key)
+      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
+      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+    end
+  end
 end
 
 local function begin_transaction(db)
@@ -409,10 +446,10 @@ function _M.export_config(skip_ws, skip_disabled_entities)
     return nil, err
   end
 
-  local stmt = "select revision, key, value " ..
+  local export_stmt = "select revision, key, value " ..
                "from cache_entries;"
 
-  local res, err = db.connector:query(stmt)
+  local res, err = db.connector:query(export_stmt)
   if not res then
     ngx.log(ngx.ERR, "xxx err = ", err)
     end_transaction(db)
