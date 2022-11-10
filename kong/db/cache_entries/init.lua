@@ -90,6 +90,8 @@ local function gen_unique_cache_key(schema, entity)
     end
   end
 
+  local ws_id = get_ws_id(schema, entity)
+
   local keys = {}
   for i = 1, #uniques do
     local unique = uniques[i]
@@ -101,7 +103,7 @@ local function gen_unique_cache_key(schema, entity)
         _, unique_key = next(unique_key)
       end
 
-      local key = unique_field_key(schema.name, entity.ws_id or "", unique, unique_key,
+      local key = unique_field_key(schema.name, ws_id, unique, unique_key,
                                    schema.fields[unique].unique_across_ws)
 
       tb_insert(keys, key)
@@ -215,6 +217,10 @@ local upsert_stmt = "insert into cache_entries(revision, key, value) " ..
                     "DO UPDATE " ..
                     "  SET revision = EXCLUDED.revision, value = EXCLUDED.value"
 
+local del_stmt = "delete from cache_entries " ..
+                 "where key='%s'"
+
+
 function _M.upsert(schema, entity, old_entity)
   local entity_name = schema.name
 
@@ -233,6 +239,7 @@ function _M.upsert(schema, entity, old_entity)
 
   local global_key = gen_global_cache_key(dao, entity)
   local schema_key = gen_schema_cache_key(dao, schema, entity)
+  ngx.log(ngx.ERR, "xxx schema_key = ", schema_key)
 
   local value = get_marshall_value(entity)
 
@@ -257,61 +264,95 @@ function _M.upsert(schema, entity, old_entity)
     res, err = connector:query(fmt(upsert_stmt, revision, key, value))
   end
 
-  -- workspace key
+  local is_create = old_entity == nil
 
-  local ws_keys = gen_workspace_key(schema, entity)
+  if is_create then
 
-  for _, key in ipairs(ws_keys) do
-    local value = query_list_value(connector, key)
+    -- workspace key
 
-    if value then
-      local value = unmarshall(value)
-      tb_insert(value, cache_key)
-      value = get_marshall_value(value)
-      ngx.log(ngx.ERR, "xxx upsert for ", key)
-      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+    local ws_keys = gen_workspace_key(schema, entity)
 
-    else
+    for _, key in ipairs(ws_keys) do
+      local value = query_list_value(connector, key)
 
-      ngx.log(ngx.ERR, "xxx no value for ", key)
+      if value then
+        local value = unmarshall(value)
+        tb_insert(value, cache_key)
+        value = get_marshall_value(value)
+        ngx.log(ngx.ERR, "xxx upsert for ", key)
+        res, err = connector:query(fmt(upsert_stmt, revision, key, value))
+        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
 
-      local value = get_marshall_value({cache_key})
-      sql = fmt(upsert_stmt, revision, key, value)
-      --ngx.log(ngx.ERR, "xxx sql:", sql)
-      --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+      else
 
-      res, err = connector:query(sql)
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+        ngx.log(ngx.ERR, "xxx no value for ", key)
+
+        local value = get_marshall_value({cache_key})
+        sql = fmt(upsert_stmt, revision, key, value)
+        --ngx.log(ngx.ERR, "xxx sql:", sql)
+        --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+
+        res, err = connector:query(sql)
+        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+      end
     end
+
+    -- foreign key
+    --ngx.log(ngx.ERR, "xxx = ", require("inspect")(entity))
+    local fkeys = gen_foreign_key(schema, entity)
+
+    for _, key in ipairs(fkeys) do
+      local value = query_list_value(connector, key)
+
+      if value then
+        local value = unmarshall(value)
+        tb_insert(value, cache_key)
+        value = get_marshall_value(value)
+        ngx.log(ngx.ERR, "xxx upsert for ", key)
+        res, err = connector:query(fmt(upsert_stmt, revision, key, value))
+        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+      else
+
+        ngx.log(ngx.ERR, "xxx no value for ", key)
+
+        local value = get_marshall_value({cache_key})
+        sql = fmt(upsert_stmt, revision, key, value)
+        --ngx.log(ngx.ERR, "xxx sql:", sql)
+        --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+
+        res, err = connector:query(sql)
+        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+      end
+    end
+
+    return true
+  end   -- is_create
+
+  ngx.log(ngx.ERR, "xxx old entity.ws_id = ", old_entity.ws_id)
+
+  -- update, remove old keys
+  local old_schema_key = gen_schema_cache_key(dao, schema, old_entity)
+  ngx.log(ngx.ERR, "xxx old_schema_key = ", old_schema_key)
+  if old_schema_key ~= schema_key then
+    sql = fmt(del_stmt, old_schema_key)
+    res, err = connector:query(sql)
   end
 
-  -- foreign key
-  --ngx.log(ngx.ERR, "xxx = ", require("inspect")(entity))
-  local fkeys = gen_foreign_key(schema, entity)
+  local old_unique_keys = gen_unique_cache_key(schema, old_entity)
+  for _, key in ipairs(old_unique_keys) do
+    ngx.log(ngx.ERR, "xxx old unique key = ", key)
+    local found = false
+    for _, k in ipairs(unique_keys) do
+      if key == k then
+        found = true
+        break
+      end
+    end
 
-  for _, key in ipairs(fkeys) do
-    local value = query_list_value(connector, key)
-
-    if value then
-      local value = unmarshall(value)
-      tb_insert(value, cache_key)
-      value = get_marshall_value(value)
-      ngx.log(ngx.ERR, "xxx upsert for ", key)
-      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-    else
-
-      ngx.log(ngx.ERR, "xxx no value for ", key)
-
-      local value = get_marshall_value({cache_key})
-      sql = fmt(upsert_stmt, revision, key, value)
-      --ngx.log(ngx.ERR, "xxx sql:", sql)
-      --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
-
+    if not found then
+      sql = fmt(del_stmt, key)
       res, err = connector:query(sql)
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
     end
   end
 
@@ -327,9 +368,6 @@ function _M.delete(schema, entity)
 
   local connector = kong.db.connector
   ngx.log(ngx.ERR, "xxx delete from cache_entries: ", entity_name)
-
-  local del_stmt = "delete from cache_entries " ..
-               "where key='%s'"
 
   local dao = kong.db[entity_name]
 
@@ -404,6 +442,8 @@ function _M.delete(schema, entity)
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
     end
   end
+
+  return true
 end
 
 local function begin_transaction(db)
