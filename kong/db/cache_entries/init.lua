@@ -193,7 +193,23 @@ local function get_revision()
   return tonumber(res[1].nextval)
 end
 
-function _M.insert(schema, entity)
+local function query_list_value(connector, key)
+  local sel_stmt = "select value from cache_entries " ..
+                   "where key='%s'"
+  local sql = fmt(sel_stmt, key)
+    ngx.log(ngx.ERR, "xxx sql = ", sql)
+  local res, err = connector:query(sql)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  local value = res and res[1] and res[1].value
+
+  return value
+end
+
+function _M.upsert(schema, entity)
   local entity_name = schema.name
 
   if entity_name == "clustering_data_planes" then
@@ -247,16 +263,7 @@ function _M.insert(schema, entity)
   local ws_keys = gen_workspace_key(schema, entity)
 
   for _, key in ipairs(ws_keys) do
-    local sel_stmt = "select value from cache_entries " ..
-                 "where key='%s'"
-    local sql = fmt(sel_stmt, key)
-      ngx.log(ngx.ERR, "xxx sql = ", sql)
-    res, err = connector:query(sql)
-    if not res then
-      ngx.log(ngx.ERR, "xxx err = ", err)
-      return nil, err
-    end
-    local value = res and res[1] and res[1].value
+    local value = query_list_value(connector, key)
 
     if value then
       local value = unmarshall(value)
@@ -285,17 +292,7 @@ function _M.insert(schema, entity)
   local fkeys = gen_foreign_key(schema, entity)
 
   for _, key in ipairs(fkeys) do
-    ngx.log(ngx.ERR, "xxx fkey = ", key)
-    local sel_stmt = "select value from cache_entries " ..
-                 "where key='%s'"
-    local sql = fmt(sel_stmt, key)
-      ngx.log(ngx.ERR, "xxx sql = ", sql)
-    res, err = connector:query(sql)
-    if not res then
-      ngx.log(ngx.ERR, "xxx err = ", err)
-      return nil, err
-    end
-    local value = res and res[1] and res[1].value
+    local value = query_list_value(connector, key)
 
     if value then
       local value = unmarshall(value)
@@ -320,6 +317,50 @@ function _M.insert(schema, entity)
   end
 
   return true
+end
+
+function _M.delete(schema, entity)
+  local entity_name = schema.name
+
+  if entity_name == "clustering_data_planes" then
+    return true
+  end
+
+  local connector = kong.db.connector
+  ngx.log(ngx.ERR, "xxx delete from cache_entries: ", entity_name)
+
+  local stmt = "delete from cache_entries " ..
+               "where key='%s'"
+
+  local dao = kong.db[entity_name]
+
+  local cache_key = gen_cache_key(dao, schema, entity)
+  local global_key = gen_global_cache_key(dao, entity)
+  local schema_key = gen_schema_cache_key(dao, schema, entity)
+
+  local keys = gen_unique_cache_key(schema, entity)
+
+  tb_insert(keys, cache_key)
+  tb_insert(keys, global_key)
+  if schema_key then
+    tb_insert(keys, schema_key)
+  end
+
+  for _, key in ipairs(keys) do
+    local sql = fmt(stmt, key)
+    ngx.log(ngx.ERR, "xxx delete sql = ", sql)
+
+    local res, err = connector:query(sql)
+    if not res then
+      ngx.log(ngx.ERR, "xxx err = ", err)
+      return nil, err
+    end
+  end
+
+  -- workspace key
+
+  local ws_keys = gen_workspace_key(schema, entity)
+
 end
 
 local function begin_transaction(db)

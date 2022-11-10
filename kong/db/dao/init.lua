@@ -1458,7 +1458,12 @@ function DAO:post_crud_event(operation, entity, old_entity, options)
     --log(ERR, self.schema.name ," entity: [", require("inspect")(entity_without_nulls), "]")
     --log(ERR, "schema: [", require("inspect")(self.schema), "]")
 
-    cache_entries.insert(self.schema, entity_without_nulls)
+    -- create or update
+    if operation == "delete" then
+      cache_entries.delete(self.schema, entity_without_nulls)
+    else
+      cache_entries.upsert(self.schema, entity_without_nulls)
+    end
 
     local ok, err = self.events.post_local("dao:crud", operation, {
       operation  = operation,
