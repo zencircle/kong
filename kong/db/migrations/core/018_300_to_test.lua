@@ -19,7 +19,13 @@ local function p_generate_cache_entries(connector)
       --ws_key = "workspaces||@list",
     }
 
-    local revision = 1
+    local res, err = connector:query("select nextval('cache_revision');")
+    if not res then
+      return nil, err
+    end
+
+    local revision = tonumber(res[1].nextval)
+
     local value = encode_base64(marshall(ws))
     local stmt = "insert into cache_entries(revision, key, value) " ..
                  "values(%d, '%s', decode('%s', 'base64'))"
