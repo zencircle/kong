@@ -18,6 +18,8 @@ local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
 local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
+local current_version = 0
+
 -- generate from schemas
 local cascade_deleting_schemas = {
   upstreams = { "targets", },
@@ -643,6 +645,8 @@ local function load_into_cache(entries)
 
   ngx.log(ngx.ERR, "xxx latest_revision = ", latest_revision)
 
+  current_version = latest_revision
+
   --kong.default_workspace = default_workspace
 
   kong.core_cache:purge()
@@ -715,6 +719,10 @@ function _M.load_into_cache_with_events(entries)
   kong_shm:delete(DECLARATIVE_LOCK_KEY)
 
   return ok, err
+end
+
+function _M.get_current_version()
+  return current_version
 end
 
 -- 1 => enable, 0 => disable
