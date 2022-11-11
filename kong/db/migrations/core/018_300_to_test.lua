@@ -62,6 +62,13 @@ return {
             "value"      BYTEA    NOT NULL,
             "event"      smallint NOT NULL
             );
+
+        DO $$
+        BEGIN
+          CREATE INDEX IF NOT EXISTS "cache_changes_revision_idx" ON "cache_changes" ("revision");
+        EXCEPTION WHEN UNDEFINED_COLUMN THEN
+          -- Do nothing, accept existing state
+        END$$;
       ]],
 
       up_f = p_generate_cache_entries,
