@@ -234,6 +234,27 @@ local upsert_stmt = "insert into cache_entries(revision, key, value) " ..
 local del_stmt = "delete from cache_entries " ..
                  "where key='%s'"
 
+local insert_changs_stmt = "insert into cache_changes(revision, key, value, event) " ..
+                           "values(%d, '%s', decode('%s', 'base64'), %d)"
+
+
+local function insert_into_changes(connector, revision, key, value, event)
+  assert(type(key) == "string")
+
+  -- nil => delete an entry
+  if value == nil then
+    value = get_marshall_value("")
+  end
+
+  local sql = fmt(insert_changs_stmt,
+                  revision, key, value, event)
+  local res, err = connector:query(sql)
+  if not res then
+    return nil, err
+  end
+
+  return true
+end
 
 -- ignore schema clustering_data_planes
 function _M.upsert(schema, entity, old_entity)
@@ -243,41 +264,54 @@ function _M.upsert(schema, entity, old_entity)
     return true
   end
 
+  -- for cache_changes table
+  local changed_keys = {}
+
   local connector = kong.db.connector
   ngx.log(ngx.ERR, "xxx insert into cache_entries: ", entity_name)
 
   local dao = kong.db[entity_name]
 
   local revision = get_revision()
-  local cache_key = gen_cache_key(dao, schema, entity)
-  ngx.log(ngx.ERR, "xxx cache_key = ", cache_key)
 
+  local cache_key = gen_cache_key(dao, schema, entity)
   local global_key = gen_global_cache_key(dao, entity)
   local schema_key = gen_schema_cache_key(dao, schema, entity)
+
+  ngx.log(ngx.ERR, "xxx cache_key = ", cache_key)
   ngx.log(ngx.ERR, "xxx schema_key = ", schema_key)
+
+  tb_insert(changed_keys, cache_key)
+  tb_insert(changed_keys, global_key)
+
+  if schema_key then
+    tb_insert(changed_keys, schema_key)
+  end
+
+  local is_create = old_entity == nil
 
   local value = get_marshall_value(entity)
 
-  local sql = fmt(upsert_stmt, revision, cache_key, value)
+  for _, key in ipairs(changed_keys) do
+    res, err = connector:query(fmt(upsert_stmt, revision, key, value))
+    if not res then
+      ngx.log(ngx.ERR, "xxx err = ", err)
+      return nil, err
+    end
 
-  local res, err = connector:query(sql)
-  if not res then
-  ngx.log(ngx.ERR, "xxx err = ", err)
-    return nil, err
-  end
-
-  res, err = connector:query(fmt(upsert_stmt, revision, global_key, value))
-
-  if schema_key then
-    res, err = connector:query(fmt(upsert_stmt, revision, schema_key, value))
+    -- insert into cache_changes
+    insert_into_changes(connector,
+                        revision, key, value, is_create and 1 or 2)
   end
 
   local unique_keys = gen_unique_cache_key(schema, entity)
   for _, key in ipairs(unique_keys) do
     res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-  end
 
-  local is_create = old_entity == nil
+    -- insert into cache_changes
+    insert_into_changes(connector,
+                        revision, key, value, is_create and 1 or 2)
+  end
 
   if is_create then
 
@@ -296,6 +330,9 @@ function _M.upsert(schema, entity, old_entity)
         res, err = connector:query(fmt(upsert_stmt, revision, key, value))
         --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
 
+        -- 2 => update existed data
+        insert_into_changes(connector, revision, key, value, 2)
+
       else
 
         ngx.log(ngx.ERR, "xxx no value for ", key)
@@ -307,6 +344,9 @@ function _M.upsert(schema, entity, old_entity)
 
         res, err = connector:query(sql)
         --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+        -- 1 => create
+        insert_into_changes(connector, revision, key, value, 1)
       end
     end
 
@@ -325,6 +365,9 @@ function _M.upsert(schema, entity, old_entity)
         res, err = connector:query(fmt(upsert_stmt, revision, key, value))
         --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
 
+        -- 2 => update existed data
+        insert_into_changes(connector, revision, key, value, 2)
+
       else
 
         ngx.log(ngx.ERR, "xxx no value for ", key)
@@ -336,6 +379,9 @@ function _M.upsert(schema, entity, old_entity)
 
         res, err = connector:query(sql)
         --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+        -- 1 => create
+        insert_into_changes(connector, revision, key, value, 1)
       end
     end
 
@@ -350,6 +396,9 @@ function _M.upsert(schema, entity, old_entity)
   if old_schema_key ~= schema_key then
     sql = fmt(del_stmt, old_schema_key)
     res, err = connector:query(sql)
+
+    -- 3 => delete
+    insert_into_changes(connector, revision, old_schema_key, nil, 3)
   end
 
   local old_unique_keys = gen_unique_cache_key(schema, old_entity)
@@ -368,6 +417,9 @@ function _M.upsert(schema, entity, old_entity)
     if not exist then
       sql = fmt(del_stmt, key)
       res, err = connector:query(sql)
+
+      -- 3 => delete
+      insert_into_changes(connector, revision, key, nil, 3)
     end
   end
 
@@ -411,6 +463,9 @@ function _M.delete(schema, entity)
       ngx.log(ngx.ERR, "xxx err = ", err)
       return nil, err
     end
+
+    -- 3 => delete
+    insert_into_changes(connector, revision, key, nil, 3)
   end
 
   -- workspace key
@@ -435,6 +490,9 @@ function _M.delete(schema, entity)
       ngx.log(ngx.ERR, "xxx delete for ", key)
       res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+      -- 2 => update existed data
+      insert_into_changes(connector, revision, key, value, 2)
     end
   end
 
@@ -458,6 +516,9 @@ function _M.delete(schema, entity)
       ngx.log(ngx.ERR, "xxx delete for ", key)
       res, err = connector:query(fmt(upsert_stmt, revision, key, value))
       --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+      -- 2 => update existed data
+      insert_into_changes(connector, revision, key, value, 2)
     end
   end
 
@@ -480,6 +541,9 @@ function _M.delete(schema, entity)
       sql = fmt(del_stmt, fkey)
       ngx.log(ngx.ERR, "xxx delete sql = ", sql)
       res, err = connector:query(sql)
+
+      -- 3 => delete
+      insert_into_changes(connector, revision, key, nil, 3)
     end
 
   end
