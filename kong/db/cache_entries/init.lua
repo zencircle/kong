@@ -26,20 +26,24 @@ local cascade_deleting_schemas = {
   services = { "plugins", },
 }
 
+-- 1e8ff358-fbba-4f32-ac9b-9f896c02b2d8
 local function get_ws_id(schema, entity)
-  local ws_id = ""
-  if schema.workspaceable then
-    local entity_ws_id = entity.ws_id
-    if entity_ws_id == null or entity_ws_id == nil then
-      entity_ws_id = kong.default_workspace
-    end
-    entity.ws_id = entity_ws_id
-    ws_id = entity_ws_id
+  if not schema.workspaceable then
+    return ""
   end
+
+  local ws_id = entity.ws_id
+
+  if ws_id == null or ws_id == nil then
+    ws_id = kong.default_workspace
+  end
+
+  entity.ws_id = ws_id
 
   return ws_id
 end
 
+-- upstreams:37add863-a3e4-4fcb-9784-bf1d43befdfa:::::1e8ff358-fbba-4f32-ac9b-9f896c02b2d8
 local function gen_cache_key(dao, schema, entity)
   local ws_id = get_ws_id(schema, entity)
 
@@ -48,6 +52,7 @@ local function gen_cache_key(dao, schema, entity)
   return cache_key
 end
 
+-- upstreams:37add863-a3e4-4fcb-9784-bf1d43befdfa:::::*
 local function gen_global_cache_key(dao, entity)
   local ws_id = "*"
 
@@ -56,6 +61,7 @@ local function gen_global_cache_key(dao, entity)
   return cache_key
 end
 
+-- targets:37add863-a3e4-4fcb-9784-bf1d43befdfa:127.0.0.1:8081::::1e8ff358-fbba-4f32-ac9b-9f896c02b2d8
 local function gen_schema_cache_key(dao, schema, entity)
   if not schema.cache_key then
     return nil
@@ -66,6 +72,7 @@ local function gen_schema_cache_key(dao, schema, entity)
   return cache_key
 end
 
+-- upstreams|1e8ff358-fbba-4f32-ac9b-9f896c02b2d8|name:9aa44d94160d95b7ebeaa1e6540ffb68379a23cd4ee2f6a0ab7624a7b2dd6623
 local function unique_field_key(schema_name, ws_id, field, value, unique_across_ws)
   if unique_across_ws then
     ws_id = ""
@@ -78,6 +85,7 @@ local function unique_field_key(schema_name, ws_id, field, value, unique_across_
   return schema_name .. "|" .. ws_id .. "|" .. field .. ":" .. value
 end
 
+-- may have many unique_keys
 local function gen_unique_cache_key(schema, entity)
   local db = kong.db
   local uniques = {}
@@ -121,6 +129,8 @@ local function gen_unique_cache_key(schema, entity)
   return keys
 end
 
+-- upstreams|1e8ff358-fbba-4f32-ac9b-9f896c02b2d8|@list
+-- upstreams|*|@list
 local function gen_workspace_key(schema, entity)
   local keys = {}
   local entity_name = schema.name
@@ -138,7 +148,8 @@ local function gen_workspace_key(schema, entity)
   return keys
 end
 
-
+-- targets|1e8ff358-fbba-4f32-ac9b-9f896c02b2d8|upstreams|37add863-a3e4-4fcb-9784-bf1d43befdfa|@list
+-- targets|*|upstreams|37add863-a3e4-4fcb-9784-bf1d43befdfa|@list
 local function gen_foreign_key(schema, entity)
   local foreign_fields = {}
   for fname, fdata in schema:each_field() do
@@ -173,20 +184,13 @@ local function gen_foreign_key(schema, entity)
   return keys
 end
 
+-- base64 for inerting into postgres
 local function get_marshall_value(obj)
   local value = marshall(obj)
   ngx.log(ngx.ERR, "xxx value size = ", #value)
 
   return encode_base64(value)
 end
-
---function _M.new()
---  local self = {
---    db = kong.db,
---
---  }
---  return setmetatable(self, _MT)
---end
 
 local function get_revision()
   local connector = kong.db.connector
@@ -203,6 +207,8 @@ local function get_revision()
   return tonumber(res[1].nextval)
 end
 
+-- key: routes|*|@list
+-- result may be nil or empty table
 local function query_list_value(connector, key)
   local sel_stmt = "select value from cache_entries " ..
                    "where key='%s'"
@@ -229,6 +235,7 @@ local del_stmt = "delete from cache_entries " ..
                  "where key='%s'"
 
 
+-- ignore schema clustering_data_planes
 function _M.upsert(schema, entity, old_entity)
   local entity_name = schema.name
 
@@ -254,10 +261,8 @@ function _M.upsert(schema, entity, old_entity)
   local sql = fmt(upsert_stmt, revision, cache_key, value)
 
   local res, err = connector:query(sql)
-
   if not res then
   ngx.log(ngx.ERR, "xxx err = ", err)
-
     return nil, err
   end
 
@@ -348,17 +353,19 @@ function _M.upsert(schema, entity, old_entity)
   end
 
   local old_unique_keys = gen_unique_cache_key(schema, old_entity)
+
   for _, key in ipairs(old_unique_keys) do
     ngx.log(ngx.ERR, "xxx old unique key = ", key)
-    local found = false
+    local exist = false
     for _, k in ipairs(unique_keys) do
       if key == k then
-        found = true
+        exist = true
         break
       end
     end
 
-    if not found then
+    -- find out old keys then delete them
+    if not exist then
       sql = fmt(del_stmt, key)
       res, err = connector:query(sql)
     end
@@ -391,6 +398,8 @@ function _M.delete(schema, entity)
     tb_insert(keys, schema_key)
   end
 
+  local revision = get_revision()
+
   local sql
   local res, err
   for _, key in ipairs(keys) do
@@ -406,7 +415,6 @@ function _M.delete(schema, entity)
 
   -- workspace key
 
-  local revision = get_revision()
   local ws_keys = gen_workspace_key(schema, entity)
 
   for _, key in ipairs(ws_keys) do
@@ -464,7 +472,7 @@ function _M.delete(schema, entity)
   local ws_ids = { "*", get_ws_id(schema, entity) }
 
   for _, v in ipairs(cascade_deleting) do
-    local del_schema = kong.db.daos[v].schema
+    local del_schema = kong.db[v].schema
 
     for _, ws_id in ipairs(ws_ids) do
       local fkey = v .. "|" .. ws_id .. "|" .. entity_name .. "|" ..
