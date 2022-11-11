@@ -49,6 +49,13 @@ return {
             );
 
         CREATE SEQUENCE "cache_revision";
+
+        CREATE TABLE IF NOT EXISTS "cache_changes" (
+            "revision"   bigint   NOT NULL,
+            "key"        TEXT     NOT NULL,
+            "value"      BYTEA    NOT NULL,
+            "event"      smallint NOT NULL
+            );
       ]],
 
       up_f = p_generate_cache_entries,
