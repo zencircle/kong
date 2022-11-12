@@ -200,6 +200,28 @@ for _, strategy in helpers.each_strategy() do
 
             assert.equals("/services?offset=" .. ngx.escape_uri(json.offset) .. "&size=3", json.next)
           end)
+
+          it("terminates pagination on the last set of results", function()
+            local offset
+            for i = 1, 5 do
+              local res = client:get("/services", {
+                query = { size = 2, offset = offset },
+              })
+
+              local body = assert.res_status(200, res)
+              local json = cjson.decode(body)
+              offset = json.offset
+
+              if i == 5 then
+                assert.is_nil(json.offset, "`offset` should be empty on the last page")
+                assert.equals(ngx.null, json.next, "`next` should be NULL on the last page")
+              else
+                assert.is_string(json.offset)
+                assert.is_string(json.next)
+              end
+            end
+
+          end)
         end)
 
         describe("with no data", function()
