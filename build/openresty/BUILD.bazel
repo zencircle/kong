@@ -1,0 +1,31 @@
+load("//build:build_system.bzl", "kong_directory_genrule")
+
+kong_directory_genrule(
+    name = "openresty",
+    srcs = [
+        "@kong_build_tools//:srcs",
+    ],
+    output_dir = "root",
+    cmd = """
+        export GENRULE_OUTPUT_DIR_FIX=${INSTALL_ROOT:-$PWD/$GENRULE_OUTPUT_DIR};
+        OPENRESTY_PREFIX=$OPENRESTY_PREFIX \
+        OPENRESTY_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
+        OPENRESTY_RPATH=$OPENRESTY_RPATH \
+        OPENSSL_PREFIX=$OPENSSL_PREFIX \
+        OPENSSL_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
+        LUAROCKS_PREFIX=$LUAROCKS_PREFIX \
+        LUAROCKS_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
+        external/kong_build_tools/openresty-build-tools/kong-ngx-build \
+            --prefix $GENRULE_OUTPUT_DIR_FIX/usr/local \
+            --openresty $RESTY_VERSION \
+            --luarocks $RESTY_LUAROCKS_VERSION \
+            --openssl $RESTY_OPENSSL_VERSION \
+            --pcre $RESTY_PCRE_VERSION \
+            --resty-lmdb $RESTY_LMDB_VERSION \
+            --resty-events $RESTY_EVENTS_VERSION \
+            --atc-router $ATC_ROUTER_VERSION \
+            --kong-nginx-module $KONG_NGINX_MODULE_BRANCH \
+            --work /tmp/work;
+    """,
+    visibility = ["//visibility:public"],
+)

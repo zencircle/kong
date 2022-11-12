@@ -1,0 +1,29 @@
+filegroup(
+    name = "srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "kong",
+    srcs = [
+        ":srcs",
+    ],
+    outs = ["kong.out"],
+    cmd = "rootlesskit --copy-up=/usr/local --state-dir=/tmp/buildroot bash scripts/build-kong.sh 2>&1 > $@",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "kong-package",
+    srcs = [
+        ":srcs",
+        ":kong",
+    ],
+    outs = [
+        "kong-package.out"
+    ],
+    # TEST: docker run --rm -it -v /tmp/kong_3.0.0_amd64.deb:/tmp/kong_3.0.0_amd64.deb debian bash
+    cmd = "nfpm pkg -f build/package/nfpm.yaml -p deb -t /tmp/ > $@",
+    visibility = ["//visibility:public"],
+)

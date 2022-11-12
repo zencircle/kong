@@ -1,5 +1,3 @@
-$(info starting make in kong)
-
 OS := $(shell uname | awk '{print tolower($$0)}')
 MACHINE := $(shell uname -m)
 
@@ -42,7 +40,7 @@ KONG_NGINX_MODULE_BRANCH ?= master
 
 PACKAGE_TYPE ?= deb
 
-TAG := $(shell git describe --exact-match --tags HEAD || true)
+TAG := $(git describe --exact-match --tags HEAD) | true
 
 ifneq ($(TAG),)
 	ISTAG = true
@@ -54,6 +52,11 @@ else
 	OFFICIAL_RELEASE = false
 	ISTAG = false
 endif
+
+build-openresty:
+	. ./.requirements
+	@echo "Building OpenResty $(RESTY_VERSION)..."
+	bazel build //build/openresty:openresty --verbose_failures
 
 release-docker-images:
 	cd $(KONG_BUILD_TOOLS_LOCATION); \
@@ -76,22 +79,6 @@ release:
 	OFFICIAL_RELEASE=$(OFFICIAL_RELEASE) \
 	KONG_TAG=${KONG_TAG} \
 	release-kong
-
-setup-ci:
-	OPENRESTY=$(RESTY_VERSION) \
-	LUAROCKS=$(RESTY_LUAROCKS_VERSION) \
-	OPENSSL=$(RESTY_OPENSSL_VERSION) \
-	OPENRESTY_PATCHES_BRANCH=$(OPENRESTY_PATCHES_BRANCH) \
-	KONG_NGINX_MODULE_BRANCH=$(KONG_NGINX_MODULE_BRANCH) \
-	.ci/setup_env.sh
-
-setup-kong-build-tools:
-	-git submodule update --init --recursive
-	-git submodule status
-	-rm -rf $(KONG_BUILD_TOOLS_LOCATION)
-	-git clone https://github.com/Kong/kong-build-tools.git $(KONG_BUILD_TOOLS_LOCATION)
-	cd $(KONG_BUILD_TOOLS_LOCATION); \
-	git reset --hard && git checkout $(KONG_BUILD_TOOLS); \
 
 functional-tests: setup-kong-build-tools
 	cd $(KONG_BUILD_TOOLS_LOCATION); \

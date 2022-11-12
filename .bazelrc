@@ -1,0 +1,29 @@
+# Bazel doesn't need more than 200MB of memory for local build based on memory profiling:
+# https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
+# The default JVM max heapsize is 1/4 of physical memory up to 32GB which could be large
+# enough to consume all memory constrained by cgroup in large host.
+# Limiting JVM heapsize here to let it do GC more when approaching the limit to
+# leave room for compiler/linker.
+# The number 3G is chosen heuristically to both support large VM and small VM with RBE.
+# Startup options cannot be selected via config.
+startup --host_jvm_args=-Xmx3g
+
+run --color=yes
+
+build --color=yes
+build --incompatible_strict_action_env
+
+# Pass PATH, CC, CXX variables from the environment.
+build --action_env=CC --host_action_env=CC
+build --action_env=CXX --host_action_env=CXX
+build --action_env=PATH --host_action_env=PATH
+
+build --action_env=INSTALL_ROOT=/tmp/build --host_action_env=INSTALL_ROOT=/tmp/build
+
+# Additional OpenResty build options
+build:release --action_env=OPENRESTY_PREFIX=/usr/local/openresty --host_action_env=OPENRESTY_PREFIX=/usr/local/openresty
+build:release --action_env=OPENRESTY_RPATH=/usr/local/kong/lib --host_action_env=OPENRESTY_RPAH=/usr/local/kong/lib
+build:release --action_env=OPENSSL_PREFIX=/usr/local/kong --host_action_env=OPENSSL_PREFIX=/usr/local/kong
+build:release --action_env=LUAROCKS_PREFIX=/usr/local --host_action_env=LUAROCKS_PREFIX=/usr/local
+
+build --spawn_strategy=local

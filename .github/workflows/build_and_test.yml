@@ -27,28 +27,36 @@ jobs:
       DOWNLOAD_ROOT: $HOME/download-root
 
     steps:
+    - name: Checkout Kong source code
+      uses: actions/checkout@v3
+
     - name: Set environment variables
       run: |
           echo "INSTALL_ROOT=$HOME/install-root" >> $GITHUB_ENV
-          echo "DOWNLOAD_ROOT=$HOME/download-root" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$INSTALL_ROOT/openssl/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-    - name: Checkout Kong source code
-      uses: actions/checkout@v3
+          grep -v '^#' .requirements >> $GITHUB_ENV
 
     - name: Lookup build cache
       uses: actions/cache@v3
       id: cache-deps
       with:
-        path: ${{ env.INSTALL_ROOT }}
+        path: |
+          ${{ env.INSTALL_ROOT }}
         key: ${{ hashFiles('.ci/setup_env_github.sh') }}-${{ hashFiles('.github/workflows/build_and_test.yml') }}-${{ hashFiles('.requirements') }}-${{ hashFiles('kong-*.rockspec') }}-${{ hashFiles('Makefile') }}
 
-    - name: Checkout kong-build-tools
+    - uses: bazelbuild/setup-bazelisk@v2
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
+
+    - name: Mount bazel cache
+      uses: actions/cache@v3
+      if: steps.cache-deps.outputs.cache-hit != 'true'
       with:
-        repository: Kong/kong-build-tools
-        path: kong-build-tools
-        ref: master
+        path: |
+          "~/.cache/bazel"
+          /tmp/work
+        key: bazel-${{ hashFiles('.bazelversion') }}
+        restore-keys: |
+          bazel-
 
     - name: Checkout go-pluginserver
       if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -59,7 +67,7 @@ jobs:
 
     - name: Add to Path
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      run: echo "$INSTALL_ROOT/openssl/bin:$INSTALL_ROOT/openresty/nginx/sbin:$INSTALL_ROOT/openresty/bin:$INSTALL_ROOT/luarocks/bin:$GITHUB_WORKSPACE/kong-build-tools/openresty-build-tools" >> $GITHUB_PATH
+      run: echo "$INSTALL_ROOT/openssl/bin:$INSTALL_ROOT/openresty/nginx/sbin:$INSTALL_ROOT/openresty/bin:$INSTALL_ROOT/luarocks/bin" >> $GITHUB_PATH
 
     - name: Install packages
       if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -68,7 +76,8 @@ jobs:
     - name: Build Kong dependencies
       if: steps.cache-deps.outputs.cache-hit != 'true'
       run: |
-          source .ci/setup_env_github.sh
+          bazel build //build/openresty:openresty --verbose_failures
+          eval $(luarocks path)
           make dev
 
   lint-doc-and-unit-tests:
