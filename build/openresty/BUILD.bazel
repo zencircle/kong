@@ -8,13 +8,6 @@ kong_directory_genrule(
     output_dir = "root",
     cmd = """
         export GENRULE_OUTPUT_DIR_FIX=${INSTALL_ROOT:-$PWD/$GENRULE_OUTPUT_DIR};
-        OPENRESTY_PREFIX=$OPENRESTY_PREFIX \
-        OPENRESTY_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
-        OPENRESTY_RPATH=$OPENRESTY_RPATH \
-        OPENSSL_PREFIX=$OPENSSL_PREFIX \
-        OPENSSL_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
-        LUAROCKS_PREFIX=$LUAROCKS_PREFIX \
-        LUAROCKS_DESTDIR=$GENRULE_OUTPUT_DIR_FIX \
         external/kong_build_tools/openresty-build-tools/kong-ngx-build \
             --prefix $GENRULE_OUTPUT_DIR_FIX/usr/local \
             --openresty $RESTY_VERSION \
