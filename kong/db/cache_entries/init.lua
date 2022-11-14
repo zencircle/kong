@@ -38,9 +38,8 @@ local function get_ws_id(schema, entity)
 
   if ws_id == null or ws_id == nil then
     ws_id = kong.default_workspace
+    entity.ws_id = ws_id
   end
-
-  entity.ws_id = ws_id
 
   return ws_id
 end
@@ -186,7 +185,7 @@ local function gen_foreign_key(schema, entity)
   return keys
 end
 
--- base64 for inerting into postgres
+-- base64 for inserting into postgres
 local function get_marshall_value(obj)
   local value = marshall(obj)
   ngx.log(ngx.ERR, "xxx value size = ", #value)
@@ -240,6 +239,7 @@ local insert_changs_stmt = "insert into cache_changes(revision, key, value, even
                            "values(%d, '%s', decode('%s', 'base64'), %d)"
 
 
+-- event: 0=>reserved, 1=>create, 2=>update 3=>delete
 local function insert_into_changes(connector, revision, key, value, event)
   assert(type(key) == "string")
 
@@ -293,6 +293,8 @@ function _M.upsert(schema, entity, old_entity)
   local is_create = old_entity == nil
 
   local value = get_marshall_value(entity)
+
+  local res, err
 
   for _, key in ipairs(changed_keys) do
     res, err = connector:query(fmt(upsert_stmt, revision, key, value))
@@ -629,10 +631,13 @@ local function load_into_cache(entries)
 
     t:set(entry.key, entry.value)
 
-    if entry.key == "workspaces:default:::::" then
-      local obj = unmarshall(entry.value)
-      default_ws = obj.id
-      ngx.log(ngx.ERR, "xxx find default_ws = ", default_ws)
+    -- find the default workspace id
+    if not default_ws then
+      if entry.key == "workspaces:default:::::" then
+        local obj = unmarshall(entry.value)
+        default_ws = obj.id
+        ngx.log(ngx.ERR, "xxx find default_ws = ", default_ws)
+      end
     end
   end -- entries
 
