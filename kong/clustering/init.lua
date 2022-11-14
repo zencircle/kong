@@ -31,6 +31,7 @@ local function post_push_config_event()
   if not res then
     ngx_log(ngx_ERR, _log_prefix, "unable to broadcast event: ", err)
   end
+  --ngx.log(ngx.ERR, "disable push mode, use pull mode")
 end
 
 

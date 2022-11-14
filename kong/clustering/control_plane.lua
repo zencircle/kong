@@ -343,7 +343,8 @@ function _M:handle_cp_websocket()
     local ok
     ok, err = kong.db.clustering_data_planes:upsert({ id = dp_id, }, {
       last_seen = last_seen,
-      config_hash = config_hash ~= "" and config_hash or nil,
+      --config_hash = config_hash ~= "" and config_hash or nil,
+      config_hash = DECLARATIVE_EMPTY_CONFIG_HASH,  -- ignore schema error
       hostname = dp_hostname,
       ip = dp_ip,
       version = dp_version,
@@ -456,6 +457,15 @@ function _M:handle_cp_websocket()
         -- queue PONG to avoid races
         table_insert(queue, PONG_TYPE)
         queue.post()
+
+        -- try to trigger incremental sync, config_hash is dp's revision
+        ngx.log(ngx.ERR, "xxx DP current revision is:", config_hash)
+        local current_revision = cache_entries.get_current_version()
+
+        if current_revision ~= config_hash then
+          ngx.log(ngx.ERR, "try to trigger incremental sync, ",
+                           config_hash, "=>", current_revision)
+        end
       end
     end
   end)

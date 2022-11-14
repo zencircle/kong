@@ -205,7 +205,10 @@ local function get_revision()
   end
 
   --ngx.log(ngx.ERR, "xxx revison = ", require("inspect")(res))
-  return tonumber(res[1].nextval)
+  --return tonumber(res[1].nextval)
+  current_version = tonumber(res[1].nextval)
+
+  return current_version
 end
 
 -- key: routes|*|@list
@@ -643,6 +646,7 @@ local function load_into_cache(entries)
     end
   end -- entries
 
+  -- we can get current_version from lmdb
   t:set(DECLARATIVE_HASH_KEY, tostring(latest_revision))
 
   local ok, err = t:commit()
@@ -652,7 +656,7 @@ local function load_into_cache(entries)
 
   ngx.log(ngx.ERR, "xxx latest_revision = ", latest_revision)
 
-  current_version = latest_revision
+  --current_version = latest_revision
 
   --kong.default_workspace = default_workspace
 
