@@ -1,9 +1,9 @@
 local _M = {}
-local _MT = { __index = _M, }
+--local _MT = { __index = _M, }
 
 local utils = require "kong.tools.utils"
 local constants = require "kong.constants"
-local lmdb = require "resty.lmdb"
+--local lmdb = require "resty.lmdb"
 local txn = require "resty.lmdb.transaction"
 
 local type = type
@@ -317,6 +317,8 @@ function _M.upsert(schema, entity, old_entity)
                         revision, key, value, is_create and 1 or 2)
   end
 
+  local sql
+
   if is_create then
 
     -- workspace key
@@ -537,7 +539,7 @@ function _M.delete(schema, entity)
   local ws_ids = { "*", get_ws_id(schema, entity) }
 
   for _, v in ipairs(cascade_deleting) do
-    local del_schema = kong.db[v].schema
+    --local del_schema = kong.db[v].schema
 
     for _, ws_id in ipairs(ws_ids) do
       local fkey = v .. "|" .. ws_id .. "|" .. entity_name .. "|" ..
@@ -547,7 +549,7 @@ function _M.delete(schema, entity)
       res, err = connector:query(sql)
 
       -- 3 => delete
-      insert_into_changes(connector, revision, key, nil, 3)
+      insert_into_changes(connector, revision, fkey, nil, 3)
     end
 
   end
@@ -712,7 +714,7 @@ function _M.load_into_cache_with_events(entries)
   local ok, err = kong_shm:add(DECLARATIVE_LOCK_KEY, 0, DECLARATIVE_LOCK_TTL)
   if not ok then
     if err == "exists" then
-      local ttl = min(kong_shm:ttl(DECLARATIVE_LOCK_KEY), DECLARATIVE_RETRY_TTL_MAX)
+      local ttl = math.min(kong_shm:ttl(DECLARATIVE_LOCK_KEY), DECLARATIVE_RETRY_TTL_MAX)
       return nil, "busy", ttl
     end
 
