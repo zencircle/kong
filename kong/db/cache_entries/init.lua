@@ -18,7 +18,7 @@ local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
 local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
-local current_version = 1
+local current_version
 
 -- generate from schemas
 local cascade_deleting_schemas = {
@@ -733,6 +733,24 @@ function _M.load_into_cache_with_events(entries)
 end
 
 function _M.get_current_version()
+  if current_version then
+    return current_version
+  end
+
+  local connector = kong.db.connector
+
+  local sql = "SELECT last_value FROM cache_revision;"
+
+  local res, err = connector:query(sql)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  ngx.log(ngx.ERR, "xxx revison = ", require("inspect")(res))
+  --return tonumber(res[1].nextval)
+  current_version = tonumber(res[1].last_value)
+
   return current_version
 end
 

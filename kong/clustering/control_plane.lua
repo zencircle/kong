@@ -505,12 +505,22 @@ function _M:handle_cp_websocket()
           local current_revision = tonumber(cache_entries.get_current_version())
           ngx.log(ngx.ERR, "xxx cp incremental ", dp_revision, "=>", current_revision)
 
-          -- revision is not correct, do full sync
-          if dp_revision > current_revision then
+          -- revision is not correct, or too old, do full sync
+          if (dp_revision > current_revision) or
+             (current_revision - dp_revision > 100)
+          then
             ngx.log(ngx.ERR, "xxx try full sync to dp")
             table_insert(queue, RECONFIGURE_TYPE)
             queue.post()
+
+          elseif dp_revision == current_revision then
+            ngx.log(ngx.ERR, "xxx need not sync to dp")
+
+          else
+            ngx.log(ngx.ERR, "xxx try incremental sync to dp")
+
           end
+
 
         else -- is reconfigure
           ngx.log(ngx.ERR, "xxx cp reconfigure")
