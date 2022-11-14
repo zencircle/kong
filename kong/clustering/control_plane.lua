@@ -54,6 +54,7 @@ local CLUSTERING_SYNC_STATUS = constants.CLUSTERING_SYNC_STATUS
 local DECLARATIVE_EMPTY_CONFIG_HASH = constants.DECLARATIVE_EMPTY_CONFIG_HASH
 local PONG_TYPE = "PONG"
 local RECONFIGURE_TYPE = "RECONFIGURE"
+local INCREMENTAL_TYPE = "INCREMENTAL"
 local REMOVED_FIELDS = require("kong.clustering.compat.removed_fields")
 local _log_prefix = "[clustering] "
 
@@ -459,13 +460,16 @@ function _M:handle_cp_websocket()
         queue.post()
 
         -- try to trigger incremental sync, config_hash is dp's revision
-        ngx.log(ngx.ERR, "xxx DP current revision is:", config_hash)
-        local current_revision = cache_entries.get_current_version()
+        --ngx.log(ngx.ERR, "xxx DP current revision is:", config_hash)
+        --local current_revision = cache_entries.get_current_version()
 
-        if current_revision ~= config_hash then
-          ngx.log(ngx.ERR, "try to trigger incremental sync, ",
-                           config_hash, "=>", current_revision)
-        end
+        --if current_revision ~= config_hash then
+        --  ngx.log(ngx.ERR, "try to trigger incremental sync, ",
+        --                   config_hash, "=>", current_revision)
+        --end
+        table_insert(queue, INCREMENTAL_TYPE)
+        queue.post()
+
       end
     end
   end)
@@ -493,6 +497,19 @@ function _M:handle_cp_websocket()
 
           else
             ngx_log(ngx_DEBUG, _log_prefix, "sent pong frame to data plane", log_suffix)
+          end
+
+        -- incremental sync
+        elseif payload == INCREMENTAL_TYPE then
+          local dp_revision = tonumber(config_hash)
+          local current_revision = tonumber(cache_entries.get_current_version())
+          ngx.log(ngx.ERR, "xxx cp incremental ", dp_revision, "=>", current_revision)
+
+          -- revision is not correct, do full sync
+          if dp_revision > current_revision then
+            ngx.log(ngx.ERR, "xxx try full sync to dp")
+            table_insert(queue, RECONFIGURE_TYPE)
+            queue.post()
           end
 
         else -- is reconfigure
@@ -529,6 +546,7 @@ function _M:handle_cp_websocket()
             end
           end
         end
+
 
       elseif err ~= "timeout" then
         return nil, "semaphore wait error: " .. err

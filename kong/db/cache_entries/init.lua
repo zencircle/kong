@@ -18,7 +18,7 @@ local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
 local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
-local current_version = 0
+local current_version = 1
 
 -- generate from schemas
 local cascade_deleting_schemas = {

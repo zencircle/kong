@@ -27,11 +27,11 @@ local _log_prefix = "[clustering] "
 
 -- Sends "clustering", "push_config" to all workers in the same node, including self
 local function post_push_config_event()
-  local res, err = kong.worker_events.post("clustering", "push_config")
-  if not res then
-    ngx_log(ngx_ERR, _log_prefix, "unable to broadcast event: ", err)
-  end
-  --ngx.log(ngx.ERR, "disable push mode, use pull mode")
+  --local res, err = kong.worker_events.post("clustering", "push_config")
+  --if not res then
+  --  ngx_log(ngx_ERR, _log_prefix, "unable to broadcast event: ", err)
+  --end
+  ngx.log(ngx.ERR, "disable push mode, use pull mode")
 end
 
 
