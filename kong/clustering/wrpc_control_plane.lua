@@ -117,10 +117,10 @@ end
 
 local config_version = 0
 
-local function get_now_ms()
-  ngx.update_time()
-  return ngx_time() * 1000
-end
+--local function get_now_ms()
+--  ngx.update_time()
+--  return ngx_time() * 1000
+--end
 
 
 function _M:export_deflated_reconfigure_payload()
