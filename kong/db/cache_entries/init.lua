@@ -16,6 +16,8 @@ local exiting = ngx.worker.exiting
 local marshall = require("kong.db.declarative.marshaller").marshall
 local unmarshall = require("kong.db.declarative.marshaller").unmarshall
 
+local is_http_subsystem = ngx.config.subsystem == "http"
+
 local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
 local current_version
@@ -741,6 +743,11 @@ local function load_into_cache_with_events_no_lock(entries)
   end
 
   -- TODO: send to stream subsystem
+  if is_http_subsystem and #kong.configuration.stream_listeners > 0 then
+    -- update stream if necessary
+    ngx.log(ngx.ERR, "xxx update stream if necessary = ")
+  end
+
 
   if exiting() then
     return nil, "exiting"
