@@ -69,5 +69,8 @@ return {
       "error_code",
       "error_message",
     },
+    acme = {
+      "account_key",
+    },
   },
 }
