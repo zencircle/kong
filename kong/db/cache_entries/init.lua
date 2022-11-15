@@ -650,14 +650,15 @@ end
 local function load_into_cache(entries)
   ngx.log(ngx.ERR, "xxx count = ", #entries)
 
-  local is_incremental = entries[1].event ~= nil
+  --local is_incremental = entries[1].event ~= nil
+  local is_full_sync = entries[1].event == nil
 
   local default_ws
 
   local t = txn.begin(#entries)
 
   -- full sync will drop all data
-  if not is_incremental then
+  if is_full_sync then
     t:db_drop(false)
   end
 
