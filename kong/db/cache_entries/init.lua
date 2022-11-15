@@ -621,20 +621,58 @@ function _M.export_config(skip_ws, skip_disabled_entities)
   return res
 end
 
+function _M.export_inc_config(dp_revision)
+  local db = kong.db
+
+  local ok, err = begin_transaction(db)
+  if not ok then
+    return nil, err
+  end
+
+  local export_stmt = "select revision, key, value,event " ..
+                      "from cache_changes " ..
+                      "where revision > " .. dp_revision
+  ngx.log(ngx.ERR, "xxx _M.export_inc_config = ", export_stmt)
+
+  local res, err = db.connector:query(export_stmt)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    end_transaction(db)
+    return nil, err
+  end
+
+  end_transaction(db)
+
+  return res
+end
+
+
 local function load_into_cache(entries)
-  --ngx.log(ngx.ERR, "xxx count = ", #entries)
+  ngx.log(ngx.ERR, "xxx count = ", #entries)
+
+  local is_incremental = entries[1].event ~= nil
 
   local default_ws
 
   local t = txn.begin(#entries)
-  t:db_drop(false)
+
+  -- full sync will drop all data
+  if not is_incremental then
+    t:db_drop(false)
+  end
 
   local latest_revision = 0
   for _, entry in ipairs(entries) do
     latest_revision = math.max(latest_revision, entry.revision)
     ngx.log(ngx.ERR, "xxx revision = ", entry.revision, " key = ", entry.key)
 
-    t:set(entry.key, entry.value)
+    if entry.event and entry.event == 3 then
+      -- incremental delete
+      t:set(entry.key, nil)
+
+    else
+      t:set(entry.key, entry.value)
+    end
 
     -- find the default workspace id
     if not default_ws then
@@ -662,6 +700,10 @@ local function load_into_cache(entries)
 
   kong.core_cache:purge()
   kong.cache:purge()
+
+  if not default_ws then
+    default_ws = kong.default_workspace
+  end
 
   return true, nil, default_ws
 end

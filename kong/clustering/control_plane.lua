@@ -519,6 +519,26 @@ function _M:handle_cp_websocket()
           else
             ngx.log(ngx.ERR, "xxx try incremental sync to dp")
 
+            local config_table = cache_entries.export_inc_config(dp_revision)
+
+            local payload = {
+              type = "reconfigure",
+              timestamp = ngx_now(),
+              config_table = config_table,
+              config_hash = 1,
+              hashes = {},
+            }
+
+            local deflated_payload = deflate_gzip(cjson_encode(payload))
+            ngx.log(ngx.ERR, "xxx incremental sync data = ", #deflated_payload)
+
+            local _, err = wb:send_binary(deflated_payload)
+            if err then
+              return nil, "unable to send updated configuration to data plane: " .. err
+
+            else
+              ngx_log(ngx_DEBUG, _log_prefix, "sent config update to data plane", log_suffix)
+            end
           end
 
 

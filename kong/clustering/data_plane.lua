@@ -76,6 +76,7 @@ end
 local function send_ping(c, log_suffix)
   log_suffix = log_suffix or ""
 
+  -- get hash/revision from lmdb
   local hash = declarative.get_current_hash()
 
   if hash == true then
@@ -256,6 +257,7 @@ function _M:communicate(premature)
         last_seen = ngx_time()
 
         if typ == "binary" then
+          -- next_data => config thread
           next_data = data
           if config_semaphore:count() <= 0 then
             -- the following line always executes immediately after the `if` check
