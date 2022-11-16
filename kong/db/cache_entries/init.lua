@@ -22,6 +22,8 @@ local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 
 local current_version
 
+local uniques = {}
+
 -- generate from schemas
 local cascade_deleting_schemas = {
   upstreams = { "targets", },
@@ -91,29 +93,35 @@ end
 -- may have many unique_keys
 local function gen_unique_cache_key(schema, entity)
   local db = kong.db
-  local uniques = {}
 
-  for fname, fdata in schema:each_field() do
-    local is_foreign = fdata.type == "foreign"
-    local fdata_reference = fdata.reference
+  local unique_fields = uniques[schema.name]
+  if not unique_fields then
+    unique_fields = {}
 
-    if fdata.unique then
-      if is_foreign then
-        if #db[fdata_reference].schema.primary_key == 1 then
-          tb_insert(uniques, fname)
+    for fname, fdata in schema:each_field() do
+      local is_foreign = fdata.type == "foreign"
+      local fdata_reference = fdata.reference
+
+      if fdata.unique then
+        if is_foreign then
+          if #db[fdata_reference].schema.primary_key == 1 then
+            tb_insert(unique_fields, fname)
+          end
+
+        else
+          tb_insert(unique_fields, fname)
         end
-
-      else
-        tb_insert(uniques, fname)
       end
-    end
+    end -- for schema:each_field()
+
+    uniques[schema.name] = unique_fields
   end
 
   local ws_id = get_ws_id(schema, entity)
 
   local keys = {}
-  for i = 1, #uniques do
-    local unique = uniques[i]
+  for i = 1, #unique_fields do
+    local unique = unique_fields[i]
     local unique_key = entity[unique]
     if unique_key then
       if type(unique_key) == "table" then
