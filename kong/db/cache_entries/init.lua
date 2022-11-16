@@ -23,6 +23,7 @@ local DECLARATIVE_HASH_KEY = constants.DECLARATIVE_HASH_KEY
 local current_version
 
 local uniques = {}
+local foreigns = {}
 
 -- generate from schemas
 local cascade_deleting_schemas = {
@@ -162,14 +163,19 @@ end
 -- targets|1e8ff358-fbba-4f32-ac9b-9f896c02b2d8|upstreams|37add863-a3e4-4fcb-9784-bf1d43befdfa|@list
 -- targets|*|upstreams|37add863-a3e4-4fcb-9784-bf1d43befdfa|@list
 local function gen_foreign_key(schema, entity)
-  local foreign_fields = {}
-  for fname, fdata in schema:each_field() do
-    local is_foreign = fdata.type == "foreign"
-    local fdata_reference = fdata.reference
+  local foreign_fields = foreigns[schema.name]
 
-    if is_foreign then
-      foreign_fields[fname] = fdata_reference
+  if not foreign_fields then
+    foreign_fields = {}
+    for fname, fdata in schema:each_field() do
+      local is_foreign = fdata.type == "foreign"
+      local fdata_reference = fdata.reference
+
+      if is_foreign then
+        foreign_fields[fname] = fdata_reference
+      end
     end
+    foreigns[schema.name] = foreign_fields
   end
 
   local entity_name = schema.name
