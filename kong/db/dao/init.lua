@@ -657,9 +657,9 @@ local function find_cascade_delete_entities(self, entity, show_ws_id)
 
   recursion_over_constraints(self, entity, show_ws_id, entries)
 
-  for _, e in ipairs(entries) do
-    ngx.log(ngx.ERR, "del:", require("inspect")(e.entity))
-  end
+  --for _, e in ipairs(entries) do
+  --  ngx.log(ngx.ERR, "del:", require("inspect")(e.entity))
+  --end
 
   return entries
 end
