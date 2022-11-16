@@ -615,20 +615,60 @@ local function get_first_changed_revision()
   end
 
   --return tonumber(res[1].nextval)
-  first_revision = tonumber(res[1].revision)
+  local first_revision = tonumber(res[1].revision)
 
   return first_revision
 end
 
-function _M.export_inc_config(dp_revision)
-  local first_revision = get_first_changed_revision() or 0
+local function get_current_version()
+  if current_version then
+    return current_version
+  end
 
-  -- dp missed some changes
-  if dp_revision < first_revision then
+  local connector = kong.db.connector
+
+  local sql = "SELECT last_value FROM cache_revision;"
+
+  local res, err = connector:query(sql)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  ngx.log(ngx.ERR, "xxx revison = ", require("inspect")(res))
+  --return tonumber(res[1].nextval)
+  current_version = tonumber(res[1].last_value)
+
+  return current_version
+end
+
+function _M.export_inc_config(dp_revision)
+  local current_revision = get_current_version()
+  ngx.log(ngx.ERR, "xxx cp incremental ", dp_revision, "=>", current_revision)
+
+  if dp_revision == current_revision then
+    ngx.log(ngx.ERR, "xxx need not sync to dp")
+    return {}
+  end
+
+  -- revision is not correct, or too old, do full sync
+  if (current_revision < dp_revision ) or
+     (current_revision - dp_revision > 100)
+  then
+    ngx.log(ngx.ERR, "xxx not correct, or too old, try full sync to dp")
     return _M.export_config()
   end
 
-  assert(dp_revision >= first_revision)
+  local first_revision = get_first_changed_revision() or 1
+  ngx.log(ngx.ERR, "dp_revision=", dp_revision, " first_revision=", first_revision)
+
+  -- dp missed some changes
+  if dp_revision < (first_revision - 1) then
+    ngx.log(ngx.ERR, "xxx dp missed some changes, try full sync to dp")
+    return _M.export_config()
+  end
+
+  assert(dp_revision >= first_revision - 1)
 
   local db = kong.db
 
@@ -786,28 +826,6 @@ function _M.load_into_cache_with_events(entries)
   kong_shm:delete(DECLARATIVE_LOCK_KEY)
 
   return ok, err
-end
-
-function _M.get_current_version()
-  if current_version then
-    return current_version
-  end
-
-  local connector = kong.db.connector
-
-  local sql = "SELECT last_value FROM cache_revision;"
-
-  local res, err = connector:query(sql)
-  if not res then
-    ngx.log(ngx.ERR, "xxx err = ", err)
-    return nil, err
-  end
-
-  ngx.log(ngx.ERR, "xxx revison = ", require("inspect")(res))
-  --return tonumber(res[1].nextval)
-  current_version = tonumber(res[1].last_value)
-
-  return current_version
 end
 
 -- 1 => enable, 0 => disable

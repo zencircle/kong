@@ -502,24 +502,11 @@ function _M:handle_cp_websocket()
         -- incremental sync
         elseif payload == INCREMENTAL_TYPE then
           local dp_revision = tonumber(config_hash)
-          local current_revision = tonumber(cache_entries.get_current_version())
-          ngx.log(ngx.ERR, "xxx cp incremental ", dp_revision, "=>", current_revision)
 
-          -- revision is not correct, or too old, do full sync
-          if (dp_revision > current_revision) or
-             (current_revision - dp_revision > 100)
-          then
-            ngx.log(ngx.ERR, "xxx try full sync to dp")
-            table_insert(queue, RECONFIGURE_TYPE)
-            queue.post()
+          ngx.log(ngx.ERR, "xxx try incremental sync to dp")
 
-          elseif dp_revision == current_revision then
-            ngx.log(ngx.ERR, "xxx need not sync to dp")
-
-          else
-            ngx.log(ngx.ERR, "xxx try incremental sync to dp")
-
-            local config_table = cache_entries.export_inc_config(dp_revision)
+          local config_table, err = cache_entries.export_inc_config(dp_revision)
+          if #config_table ~= 0 then
 
             local payload = {
               type = "reconfigure",

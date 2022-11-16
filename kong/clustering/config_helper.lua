@@ -251,7 +251,7 @@ _M.calculate_config_hash = calculate_config_hash
 
 function _M.cache_update(config_table)
   assert(type(config_table) == "table")
-  ngx_log(ngx.ERR, _log_prefix, "same config received from control plane")
+  ngx_log(ngx.ERR, _log_prefix, "some config received from control plane")
   --ngx.log(ngx.ERR, "config = ", require("inspect")(config_table))
 
   local res, err = cache_entries.load_into_cache_with_events(config_table)
