@@ -8,7 +8,7 @@ function red() {
     echo -e "\033[1;31m$*\033[0m"
 }
 
-export BUSTED_ARGS="--no-k -o htest -v --exclude-tags=flaky,ipv6"
+export BUSTED_ARGS="--no-k -o htest -v --repeat=100 --exclude-tags=flaky,ipv6"
 
 if [ "$KONG_TEST_DATABASE" == "postgres" ]; then
     export TEST_CMD="bin/busted $BUSTED_ARGS,cassandra,off"
@@ -33,14 +33,14 @@ fi
 if [ "$TEST_SUITE" == "integration" ]; then
     if [[ "$TEST_SPLIT" == first* ]]; then
         # GitHub Actions, run first batch of integration tests
-        eval "$TEST_CMD" $(ls -d spec/02-integration/* | sort | grep -v 05-proxy)
+        :
 
     elif [[ "$TEST_SPLIT" == second* ]]; then
         # GitHub Actions, run second batch of integration tests
         # Note that the split here is chosen carefully to result
         # in a similar run time between the two batches, and should
         # be adjusted if imbalance become significant in the future
-        eval "$TEST_CMD" $(ls -d spec/02-integration/* | sort | grep 05-proxy)
+        :
 
     else
         # Non GitHub Actions
@@ -60,14 +60,14 @@ if [ "$TEST_SUITE" == "plugins" ]; then
 
     if [[ "$TEST_SPLIT" == first* ]]; then
         # GitHub Actions, run first batch of plugin tests
-        PLUGINS=$(ls -d spec/03-plugins/* | head -n22)
+        PLUGINS=$(ls -d spec/03-plugins/23-rate-limiting/04-access_spec.lua)
 
     elif [[ "$TEST_SPLIT" == second* ]]; then
         # GitHub Actions, run second batch of plugin tests
         # Note that the split here is chosen carefully to result
         # in a similar run time between the two batches, and should
         # be adjusted if imbalance become significant in the future
-        PLUGINS=$(ls -d spec/03-plugins/* | tail -n+23)
+        :
 
     else
         # Non GitHub Actions
