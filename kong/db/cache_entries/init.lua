@@ -792,6 +792,23 @@ function _M.get_current_version()
   return current_version
 end
 
+function _M.get_first_changed_revision()
+  local connector = kong.db.connector
+
+  local sql = "SELECT revision FROM cache_changes limit 1;"
+
+  local res, err = connector:query(sql)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  --return tonumber(res[1].nextval)
+  first_revision = tonumber(res[1].revision)
+
+  return first_revision
+end
+
 -- 1 => enable, 0 => disable
 -- flag `SYNC_TEST` in clustering/control_plane.lua
 _M.enable = 1
