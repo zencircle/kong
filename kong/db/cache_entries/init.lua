@@ -318,6 +318,36 @@ local function upsert_list_value(connector, list_key, revision, cache_key)
   end
 end
 
+local function remove_list_value(connector, list_key, revision, cache_key)
+
+  local value = query_list_value(connector, list_key)
+
+  if not value then
+    return
+  end
+
+  local res, err
+
+  local list = unmarshall(value)
+  --ngx.log(ngx.ERR, "xxx re-arrange list is: ", unpack(list))
+
+  -- remove this cache_key
+  local new_list = {}
+  for _,v in ipairs(list) do
+    if v ~= cache_key then
+      tb_insert(new_list, v)
+    end
+  end
+
+  value = get_marshall_value(new_list)
+  ngx.log(ngx.ERR, "xxx delete for ", list_key)
+  res, err = connector:query(fmt(upsert_stmt, revision, list_key, value))
+  --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+  -- 2 => update existed data
+  insert_into_changes(connector, revision, list_key, value, 2)
+end
+
 local function delete_key(connector, key, revision)
   local sql = fmt(del_stmt, key)
   ngx.log(ngx.ERR, "xxx delete sql = ", sql)
@@ -477,53 +507,14 @@ function _M.delete(schema, entity)
   local ws_keys = gen_workspace_key(schema, entity)
 
   for _, key in ipairs(ws_keys) do
-    local value = query_list_value(connector, key)
-
-    if value then
-      local list = unmarshall(value)
-      --ngx.log(ngx.ERR, "xxx re-arrange list is: ", unpack(list))
-
-      -- remove this cache_key
-      local new_list = {}
-      for _,v in ipairs(list) do
-        if v ~= cache_key then
-          tb_insert(new_list, v)
-        end
-      end
-      value = get_marshall_value(new_list)
-      ngx.log(ngx.ERR, "xxx delete for ", key)
-      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-      -- 2 => update existed data
-      insert_into_changes(connector, revision, key, value, 2)
-    end
+    remove_list_value(connector, key, revision, cache_key)
   end
 
   -- foreign key
   local fkeys = gen_foreign_key(schema, entity)
 
   for _, key in ipairs(fkeys) do
-    local value = query_list_value(connector, key)
-
-    if value then
-      local list = unmarshall(value)
-      --ngx.log(ngx.ERR, "xxx re-arrange list is: ", unpack(list))
-
-      local new_list = {}
-      for _,v in ipairs(list) do
-        if v ~= cache_key then
-          tb_insert(new_list, v)
-        end
-      end
-      value = get_marshall_value(new_list)
-      ngx.log(ngx.ERR, "xxx delete for ", key)
-      res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-      --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-      -- 2 => update existed data
-      insert_into_changes(connector, revision, key, value, 2)
-    end
+    remove_list_value(connector, key, revision, cache_key)
   end
 
   -- cascade delete
