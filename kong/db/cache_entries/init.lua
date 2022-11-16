@@ -318,6 +318,16 @@ local function upsert_list_value(connector, list_key, revision, cache_key)
   end
 end
 
+local function delete_key(connector, key, revision)
+  local sql = fmt(del_stmt, key)
+  ngx.log(ngx.ERR, "xxx delete sql = ", sql)
+
+  local res, err = connector:query(sql)
+
+  -- 3 => delete
+  insert_into_changes(connector, revision, key, nil, 3)
+end
+
 -- ignore schema clustering_data_planes
 function _M.upsert(schema, entity, old_entity)
   local entity_name = schema.name
@@ -406,11 +416,7 @@ function _M.upsert(schema, entity, old_entity)
   local old_schema_key = gen_schema_cache_key(dao, schema, old_entity)
   ngx.log(ngx.ERR, "xxx old_schema_key = ", old_schema_key)
   if old_schema_key ~= schema_key then
-    sql = fmt(del_stmt, old_schema_key)
-    res, err = connector:query(sql)
-
-    -- 3 => delete
-    insert_into_changes(connector, revision, old_schema_key, nil, 3)
+    delete_key(connector, old_schema_key, revision)
   end
 
   local old_unique_keys = gen_unique_cache_key(schema, old_entity)
@@ -427,11 +433,7 @@ function _M.upsert(schema, entity, old_entity)
 
     -- find out old keys then delete them
     if not exist then
-      sql = fmt(del_stmt, key)
-      res, err = connector:query(sql)
-
-      -- 3 => delete
-      insert_into_changes(connector, revision, key, nil, 3)
+      delete_key(connector, key, revision)
     end
   end
 
@@ -467,17 +469,7 @@ function _M.delete(schema, entity)
   local sql
   local res, err
   for _, key in ipairs(keys) do
-    sql = fmt(del_stmt, key)
-    ngx.log(ngx.ERR, "xxx delete sql = ", sql)
-
-    res, err = connector:query(sql)
-    if not res then
-      ngx.log(ngx.ERR, "xxx err = ", err)
-      return nil, err
-    end
-
-    -- 3 => delete
-    insert_into_changes(connector, revision, key, nil, 3)
+    delete_key(connector, key, revision)
   end
 
   -- workspace key
@@ -550,12 +542,7 @@ function _M.delete(schema, entity)
     for _, ws_id in ipairs(ws_ids) do
       local fkey = v .. "|" .. ws_id .. "|" .. entity_name .. "|" ..
                    entity.id .. "|@list"
-      sql = fmt(del_stmt, fkey)
-      ngx.log(ngx.ERR, "xxx delete sql = ", sql)
-      res, err = connector:query(sql)
-
-      -- 3 => delete
-      insert_into_changes(connector, revision, fkey, nil, 3)
+      delete_key(connector, fkey, revision)
     end
 
   end
