@@ -227,6 +227,20 @@ local function get_revision()
   return current_version
 end
 
+
+local upsert_stmt = "insert into cache_entries(revision, key, value) " ..
+                    "values(%d, '%s', decode('%s', 'base64')) " ..
+                    "ON CONFLICT (key) " ..
+                    "DO UPDATE " ..
+                    "  SET revision = EXCLUDED.revision, value = EXCLUDED.value"
+
+local del_stmt = "delete from cache_entries " ..
+                 "where key='%s'"
+
+local insert_changs_stmt = "insert into cache_changes(revision, key, value, event) " ..
+                           "values(%d, '%s', decode('%s', 'base64'), %d)"
+
+
 -- key: routes|*|@list
 -- result may be nil or empty table
 local function query_list_value(connector, key)
@@ -244,19 +258,6 @@ local function query_list_value(connector, key)
 
   return value
 end
-
-local upsert_stmt = "insert into cache_entries(revision, key, value) " ..
-                    "values(%d, '%s', decode('%s', 'base64')) " ..
-                    "ON CONFLICT (key) " ..
-                    "DO UPDATE " ..
-                    "  SET revision = EXCLUDED.revision, value = EXCLUDED.value"
-
-local del_stmt = "delete from cache_entries " ..
-                 "where key='%s'"
-
-local insert_changs_stmt = "insert into cache_changes(revision, key, value, event) " ..
-                           "values(%d, '%s', decode('%s', 'base64'), %d)"
-
 
 local NIL_MARSHALL_VALUE = get_marshall_value("")
 
@@ -277,6 +278,44 @@ local function insert_into_changes(connector, revision, key, value, event)
   end
 
   return true
+end
+
+-- targets|*|@list
+-- targets|5c3275ba-8bc8-4def-86ba-8d79107cc002|@list
+-- targets|*|upstreams|94c3a25d-01f3-4da1-be72-79a1715dd120|@list
+-- targets|5c3275ba-8bc8-4def-86ba-8d79107cc002|upstreams|94c3a25d-01f3-4da1-be72-79a1715dd120|@list
+local function upsert_list_value(connector, list_key, revision, cache_key)
+
+  local value = query_list_value(connector, list_key)
+
+  local res, err
+
+  if value then
+    local value = unmarshall(value)
+    tb_insert(value, cache_key)
+    value = get_marshall_value(value)
+    ngx.log(ngx.ERR, "xxx upsert for ", list_key)
+    res, err = connector:query(fmt(upsert_stmt, revision, list_key, value))
+    --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+    -- 2 => update existed data
+    insert_into_changes(connector, revision, list_key, value, 2)
+
+  else
+
+    ngx.log(ngx.ERR, "xxx no value for ", list_key)
+
+    local value = get_marshall_value({cache_key})
+    local sql = fmt(upsert_stmt, revision, list_key, value)
+    --ngx.log(ngx.ERR, "xxx sql:", sql)
+    --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
+
+    res, err = connector:query(sql)
+    --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
+
+    -- 1 => create
+    insert_into_changes(connector, revision, list_key, value, 1)
+  end
 end
 
 -- ignore schema clustering_data_planes
@@ -347,34 +386,7 @@ function _M.upsert(schema, entity, old_entity)
     local ws_keys = gen_workspace_key(schema, entity)
 
     for _, key in ipairs(ws_keys) do
-      local value = query_list_value(connector, key)
-
-      if value then
-        local value = unmarshall(value)
-        tb_insert(value, cache_key)
-        value = get_marshall_value(value)
-        ngx.log(ngx.ERR, "xxx upsert for ", key)
-        res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-        -- 2 => update existed data
-        insert_into_changes(connector, revision, key, value, 2)
-
-      else
-
-        ngx.log(ngx.ERR, "xxx no value for ", key)
-
-        local value = get_marshall_value({cache_key})
-        sql = fmt(upsert_stmt, revision, key, value)
-        --ngx.log(ngx.ERR, "xxx sql:", sql)
-        --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
-
-        res, err = connector:query(sql)
-        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-        -- 1 => create
-        insert_into_changes(connector, revision, key, value, 1)
-      end
+      upsert_list_value(connector, key, revision, cache_key)
     end
 
     -- foreign key
@@ -382,34 +394,7 @@ function _M.upsert(schema, entity, old_entity)
     local fkeys = gen_foreign_key(schema, entity)
 
     for _, key in ipairs(fkeys) do
-      local value = query_list_value(connector, key)
-
-      if value then
-        local value = unmarshall(value)
-        tb_insert(value, cache_key)
-        value = get_marshall_value(value)
-        ngx.log(ngx.ERR, "xxx upsert for ", key)
-        res, err = connector:query(fmt(upsert_stmt, revision, key, value))
-        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-        -- 2 => update existed data
-        insert_into_changes(connector, revision, key, value, 2)
-
-      else
-
-        ngx.log(ngx.ERR, "xxx no value for ", key)
-
-        local value = get_marshall_value({cache_key})
-        sql = fmt(upsert_stmt, revision, key, value)
-        --ngx.log(ngx.ERR, "xxx sql:", sql)
-        --ngx.log(ngx.ERR, "xxx cache_key :", cache_key)
-
-        res, err = connector:query(sql)
-        --ngx.log(ngx.ERR, "xxx ws_key err = ", err)
-
-        -- 1 => create
-        insert_into_changes(connector, revision, key, value, 1)
-      end
+      upsert_list_value(connector, key, revision, cache_key)
     end
 
     return true
