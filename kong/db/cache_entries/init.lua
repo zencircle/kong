@@ -204,7 +204,7 @@ end
 -- base64 for inserting into postgres
 local function get_marshall_value(obj)
   local value = marshall(obj)
-  ngx.log(ngx.ERR, "xxx value size = ", #value)
+  --ngx.log(ngx.ERR, "xxx value size = ", #value)
 
   return encode_base64(value)
 end
@@ -258,13 +258,15 @@ local insert_changs_stmt = "insert into cache_changes(revision, key, value, even
                            "values(%d, '%s', decode('%s', 'base64'), %d)"
 
 
+local NIL_MARSHALL_VALUE = get_marshall_value("")
+
 -- event: 0=>reserved, 1=>create, 2=>update 3=>delete
 local function insert_into_changes(connector, revision, key, value, event)
   assert(type(key) == "string")
 
   -- nil => delete an entry
   if value == nil then
-    value = get_marshall_value("")
+    value = NIL_MARSHALL_VALUE
   end
 
   local sql = fmt(insert_changs_stmt,
