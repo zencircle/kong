@@ -643,6 +643,8 @@ local function get_current_version()
 end
 
 function _M.export_inc_config(dp_revision)
+  local dp_revision = tonumber(dp_revision)
+
   local current_revision = get_current_version()
   ngx.log(ngx.ERR, "xxx cp incremental ", dp_revision, "=>", current_revision)
 

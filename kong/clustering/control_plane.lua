@@ -501,11 +501,9 @@ function _M:handle_cp_websocket()
 
         -- incremental sync
         elseif payload == INCREMENTAL_TYPE then
-          local dp_revision = tonumber(config_hash)
-
           ngx.log(ngx.ERR, "xxx try incremental sync to dp")
 
-          local config_table, err = cache_entries.export_inc_config(dp_revision)
+          local config_table, err = cache_entries.export_inc_config(config_hash)
           if #config_table ~= 0 then
 
             local payload = {
