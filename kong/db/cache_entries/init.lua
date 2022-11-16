@@ -587,6 +587,7 @@ function _M.export_config(skip_ws, skip_disabled_entities)
     return nil, err
   end
 
+  -- TODO: query by page
   local export_stmt = "select revision, key, value " ..
                "from cache_entries;"
 
@@ -602,7 +603,33 @@ function _M.export_config(skip_ws, skip_disabled_entities)
   return res
 end
 
+local function get_first_changed_revision()
+  local connector = kong.db.connector
+
+  local sql = "SELECT revision FROM cache_changes limit 1;"
+
+  local res, err = connector:query(sql)
+  if not res then
+    ngx.log(ngx.ERR, "xxx err = ", err)
+    return nil, err
+  end
+
+  --return tonumber(res[1].nextval)
+  first_revision = tonumber(res[1].revision)
+
+  return first_revision
+end
+
 function _M.export_inc_config(dp_revision)
+  local first_revision = get_first_changed_revision() or 0
+
+  -- dp missed some changes
+  if dp_revision < first_revision then
+    return _M.export_config()
+  end
+
+  assert(dp_revision >= first_revision)
+
   local db = kong.db
 
   local ok, err = begin_transaction(db)
@@ -781,23 +808,6 @@ function _M.get_current_version()
   current_version = tonumber(res[1].last_value)
 
   return current_version
-end
-
-function _M.get_first_changed_revision()
-  local connector = kong.db.connector
-
-  local sql = "SELECT revision FROM cache_changes limit 1;"
-
-  local res, err = connector:query(sql)
-  if not res then
-    ngx.log(ngx.ERR, "xxx err = ", err)
-    return nil, err
-  end
-
-  --return tonumber(res[1].nextval)
-  first_revision = tonumber(res[1].revision)
-
-  return first_revision
 end
 
 -- 1 => enable, 0 => disable
