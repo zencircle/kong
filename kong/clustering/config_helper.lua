@@ -1,6 +1,6 @@
 local constants = require("kong.constants")
 local declarative = require("kong.db.declarative")
-local cache_entries = require("kong.db.cache_entries")
+local cache_entries = require("kong.db.cache_entries.data_plane")
 local tablepool = require("tablepool")
 local isempty = require("table.isempty")
 local isarray = require("table.isarray")

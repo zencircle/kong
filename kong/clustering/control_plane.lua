@@ -5,7 +5,7 @@ local _MT = { __index = _M, }
 local semaphore = require("ngx.semaphore")
 local cjson = require("cjson.safe")
 local declarative = require("kong.db.declarative")
-local cache_entries = require("kong.db.cache_entries")
+local cache_entries = require("kong.db.cache_entries.control_plane")
 local utils = require("kong.tools.utils")
 local clustering_utils = require("kong.clustering.utils")
 local constants = require("kong.constants")

@@ -10,7 +10,7 @@ local declarative = require("kong.db.declarative")
 local constants = require("kong.constants")
 local utils = require("kong.tools.utils")
 local pl_stringx = require("pl.stringx")
-local cache_entries = require("kong.db.cache_entries")
+local cache_entries = require("kong.db.cache_entries.data_plane")
 
 
 local assert = assert

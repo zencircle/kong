@@ -5,7 +5,7 @@ local defaults = require "kong.db.strategies.connector".defaults
 local hooks = require "kong.hooks"
 local workspaces = require "kong.workspaces"
 local new_tab = require "table.new"
-local cache_entries = require "kong.db.cache_entries"
+local cache_entries = require "kong.db.cache_entries.control_plane"
 
 
 local setmetatable = setmetatable
