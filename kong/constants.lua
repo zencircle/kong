@@ -217,7 +217,9 @@ local constants = {
   CLEAR_HEALTH_STATUS_DELAY = 300, -- 300 seconds
 
   KEY_FORMATS_MAP = key_formats_map,
-  KEY_FORMATS = key_formats
+  KEY_FORMATS = key_formats,
+
+  LMDB_DIRECTORY = "dbless.lmdb",
 }
 
 for _, v in ipairs(constants.CLUSTERING_SYNC_STATUS) do
